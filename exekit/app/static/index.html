@@ -3,14 +3,105 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ExecKit</title>
+  <title>ExecKit — Execute AI-generated Python safely</title>
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-  <main>
-    <h1>ExecKit</h1>
-    <p>Execute AI-generated Python code safely.</p>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">⌘</span>
+      <div>
+        <h1>ExecKit</h1>
+        <p class="tagline">Execute AI-generated Python code safely.</p>
+      </div>
+    </div>
+    <span class="badge" title="Executions run in isolated Solari microVMs">Powered by Solari Sandbox</span>
+  </header>
+
+  <main class="layout">
+    <!-- ---------------- left panel: key / session ---------------- -->
+    <aside class="panel side">
+      <section class="card">
+        <h2>API key</h2>
+        <label class="field">
+          <span>Key</span>
+          <input id="api-key-input" type="password" placeholder="ek_live_…" autocomplete="off" spellcheck="false">
+        </label>
+        <div class="row">
+          <button id="btn-get-key" class="btn primary">Get free API key</button>
+          <button id="btn-load-info" class="btn">Load key info</button>
+        </div>
+        <div class="meter-row">
+          <div class="meter"><div id="credits-bar" class="meter-fill"></div></div>
+          <div class="indicators">
+            <span id="credits-indicator" class="indicator" title="Remaining credits">– credits</span>
+            <span id="plan-indicator" class="indicator" title="Plan">– plan</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Session</h2>
+        <label class="field">
+          <span>Session ID</span>
+          <input id="session-input" type="text" placeholder="sess_… (empty = one-shot)" autocomplete="off" spellcheck="false">
+        </label>
+        <label class="check">
+          <input id="keep-session" type="checkbox" checked>
+          <span>Keep session alive</span>
+        </label>
+        <div class="row">
+          <button id="btn-create-session" class="btn">Create session</button>
+          <button id="btn-kill-session" class="btn danger">Kill session</button>
+        </div>
+        <p class="hint">A session keeps variables and imports between runs, like a notebook. Leave the ID empty for one-shot runs.</p>
+      </section>
+    </aside>
+
+    <!-- ---------------- main panel: editor + output ---------------- -->
+    <section class="panel main">
+      <div class="card editor-card">
+        <div class="editor-head">
+          <h2>Python</h2>
+          <div class="row">
+            <button id="btn-run" class="btn primary">▶ Run</button>
+            <button id="btn-clear" class="btn">Clear</button>
+          </div>
+        </div>
+        <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off">print("Hello from ExecKit")
+import random
+print(random.randint(1, 100))</textarea>
+      </div>
+
+      <div class="card output-card">
+        <div class="editor-head">
+          <h2>Output</h2>
+          <span id="exec-meta" class="meta"></span>
+        </div>
+        <div class="output-grid">
+          <div class="out-block">
+            <h3>stdout</h3>
+            <pre id="out-stdout" class="out"></pre>
+          </div>
+          <div class="out-block">
+            <h3>stderr</h3>
+            <pre id="out-stderr" class="out err"></pre>
+          </div>
+        </div>
+        <div id="banner" class="banner hidden"></div>
+        <div class="out-block">
+          <h3>artifacts</h3>
+          <div id="artifacts" class="artifacts"><span class="placeholder">No artifacts yet. Write files to /tmp/exekit/ in your code.</span></div>
+        </div>
+      </div>
+    </section>
   </main>
+
+  <footer class="foot">
+    <span>Built with Solari SDK.</span>
+    <span>Designed for AI agents, automations, and code-execution APIs.</span>
+  </footer>
+
   <script src="/static/app.js"></script>
 </body>
 </html>
