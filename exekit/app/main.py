@@ -5,13 +5,15 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 from app.db import create_all
-from app.routes.health import router as health_router
+from app.dependencies import ApiError
+from app.routes import executions, health, keys, sessions
 from app.schemas import ErrorDetail, ErrorResponse
 
 logger = logging.getLogger("exekit")
@@ -43,7 +45,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(health_router)
+app.include_router(health.router)
+app.include_router(keys.router)
+app.include_router(executions.router)
+app.include_router(sessions.router)
 
 
 @app.get("/", include_in_schema=False)
@@ -52,6 +57,37 @@ def index() -> FileResponse:
 
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    # Malformed bodies (e.g. non-string code) become the standard envelope
+    # instead of FastAPI's default {"detail": [...]} shape.
+    return JSONResponse(
+        status_code=400,
+        content=ErrorResponse(
+            error=ErrorDetail(
+                code="invalid_request",
+                message="Request body failed validation.",
+                details={
+                    "errors": [
+                        {"loc": list(err.get("loc", [])), "msg": err.get("msg", ""), "type": err.get("type", "")}
+                        for err in exc.errors()
+                    ]
+                },
+            )
+        ).model_dump(),
+    )
+
+
+@app.exception_handler(ApiError)
+async def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=ErrorResponse(
+            error=ErrorDetail(code=exc.code, message=exc.message, details=exc.details)
+        ).model_dump(),
+    )
 
 
 @app.exception_handler(Exception)
