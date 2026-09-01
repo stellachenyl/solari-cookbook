@@ -201,6 +201,11 @@ class SolariRunner:
         self._client_lock = asyncio.Lock()
         self._handles: dict[str, _SessionHandle] = {}
 
+    @property
+    def artifact_dir(self) -> str:
+        """Guest directory where executions may write downloadable artifacts."""
+        return self._artifact_dir
+
     # -- health / introspection -------------------------------------------------
 
     async def health_check(self) -> dict:
