@@ -4,7 +4,9 @@ download, and cross-user ownership."""
 
 import base64
 
-from app.models import ExecutionArtifact  # noqa: F401  (registers tables for standalone runs)
+from sqlmodel import Session as DBSession, select
+
+from app.models import ApiKey, ExecutionArtifact  # noqa: F401  (tables for standalone runs)
 from app.services.solari_runner import SolariExecutionResult
 
 
@@ -283,3 +285,211 @@ def test_history_list_is_scoped_to_caller(client, key_and_header, fake_runner):
     foreign = _other_key_header(client)
     body = client.get("/executions", headers=foreign).json()
     assert body["executions"] == []
+
+
+# --- QA additions: auth, encoding paths, abuse cases, observability -----------------
+
+
+def test_history_endpoints_reject_invalid_and_inactive_keys(
+    client, key_and_header, engine
+):
+    _, headers = key_and_header
+    exec_id = 1  # no execution needed: auth is checked before any lookup
+    paths = [
+        "/executions",
+        f"/executions/{exec_id}",
+        f"/executions/{exec_id}/artifacts",
+        f"/executions/{exec_id}/artifacts/1/download",
+    ]
+    for path in paths:
+        resp = client.get(path, headers={"X-API-Key": "ek_live_totallywrongkey"})
+        assert resp.status_code == 401
+        assert resp.json()["error"]["code"] == "invalid_api_key"
+
+    # deactivate the fixture's key and prove deactivation beats data access
+    with DBSession(engine) as db:
+        key = db.exec(select(ApiKey).where(ApiKey.email == "qa@example.com")).first()
+        key.is_active = False
+        db.add(key)
+        db.commit()
+    for path in paths:
+        resp = client.get(path, headers=headers)
+        assert resp.status_code == 403
+        assert resp.json()["error"]["code"] == "api_key_inactive"
+
+
+def test_non_base64_artifact_encoding_is_stored_verbatim(
+    client, key_and_header, fake_runner
+):
+    """encoding != base64 takes the utf-8 encode path; size matches the bytes."""
+    _, headers = key_and_header
+    exec_id = _run(client, headers, fake_runner, artifacts=[{
+        "filename": "plain.txt", "path": "/tmp/exekit/plain.txt",
+        "mime_type": "text/plain", "encoding": "identity", "data": "raw text",
+    }])["execution_id"]
+    meta = client.get(f"/executions/{exec_id}/artifacts", headers=headers).json()["artifacts"][0]
+    assert meta["size_bytes"] == len("raw text".encode())
+    assert meta["download_available"] is True
+    art_id = meta["id"]
+    resp = client.get(f"/executions/{exec_id}/artifacts/{art_id}/download", headers=headers)
+    assert resp.status_code == 200
+    assert resp.text == "raw text"
+
+
+def test_download_filename_with_quotes_and_newline_is_sanitized(
+    client, key_and_header, fake_runner
+):
+    """Header-injection attempts fall back to artifact.txt in the header while
+    X-Artifact-Filename keeps the quoted original for the client."""
+    _, headers = key_and_header
+    evil = 'bad"\r\nX-Evil: injected.txt'
+    exec_id = _run(client, headers, fake_runner,
+                   artifacts=[{"filename": evil, "path": None,
+                               "mime_type": "text/plain", "encoding": "base64",
+                               "data": _b64_bytes(b"x")}])["execution_id"]
+    art_id = client.get(f"/executions/{exec_id}/artifacts", headers=headers).json()["artifacts"][0]["id"]
+    resp = client.get(f"/executions/{exec_id}/artifacts/{art_id}/download", headers=headers)
+    assert resp.status_code == 200
+    disposition = resp.headers["content-disposition"]
+    assert "X-Evil" not in disposition
+    assert "\r" not in disposition and "\n" not in disposition
+    assert 'filename="artifact.txt"' in disposition
+
+
+def test_infra_failed_executions_appear_in_history(client, key_and_header, fake_runner):
+    """503 solari_unconfigured rows are recorded and listed like any other."""
+    fake_runner.set_status("solari_unconfigured",
+                           error="SOLARI_API_KEY is not set on the server")
+    _, headers = key_and_header
+    resp = client.post("/executions", json={"code": "print(1)"}, headers=headers)
+    assert resp.status_code == 503
+    body = client.get("/executions", headers=headers).json()
+    assert len(body["executions"]) == 1
+    row = body["executions"][0]
+    assert row["status"] == "solari_unconfigured"
+    assert row["exit_code"] is None and row["artifact_count"] == 0
+    detail = client.get(f"/executions/{row['id']}", headers=headers).json()
+    assert detail["error"] is not None
+    assert detail["code"] is None  # include_code not requested
+
+
+def test_history_is_read_only_and_repeatable(client, key_and_header, fake_runner):
+    _, headers = key_and_header
+    exec_id = _run(client, headers, fake_runner,
+                   artifacts=[_art("r.txt", _b64_bytes(b"data"))])["execution_id"]
+    first = client.get(f"/executions/{exec_id}", headers=headers).json()
+    second = client.get(f"/executions/{exec_id}", headers=headers).json()
+    assert first == second  # no state mutated by reads
+    # and downloads do not consume or change anything
+    art_id = first["artifacts"][0]["id"]
+    for _ in range(2):
+        assert client.get(
+            f"/executions/{exec_id}/artifacts/{art_id}/download",
+            headers=headers).text == "data"
+
+
+def test_artifact_download_is_logged_without_content(
+    client, key_and_header, fake_runner, caplog
+):
+    """The audit log line carries ids and byte size, never artifact content."""
+    import logging as _logging
+
+    _, headers = key_and_header
+    exec_id = _run(client, headers, fake_runner,
+                   artifacts=[_art("audit.txt", _b64_bytes(b"secret-content"))])["execution_id"]
+    art_id = client.get(f"/executions/{exec_id}/artifacts", headers=headers).json()["artifacts"][0]["id"]
+    with caplog.at_level(_logging.INFO, logger="exekit.history"):
+        client.get(f"/executions/{exec_id}/artifacts/{art_id}/download", headers=headers)
+    lines = [r.getMessage() for r in caplog.records if r.name == "exekit.history"]
+    assert any("artifact downloaded" in m for m in lines)
+    assert all("secret-content" not in m for m in lines)
+
+
+# --- QA additions: remaining-risk tests (fault injection, concurrency) --------------
+
+import pytest
+
+
+def test_crash_between_execution_and_artifact_commit_degrades_cleanly(
+    client, key_and_header, fake_runner, engine, monkeypatch
+):
+    """A crash after the execution row commits but before artifacts persist
+    leaves a completed execution with zero artifacts: no corruption, no
+    orphaned rows, and history degrades to download_available=false."""
+    import app.services.executions as svc
+
+    _, headers = key_and_header
+    original = svc.persist_artifacts
+
+    def exploding_persist(db, execution_id, artifacts):
+        if artifacts:
+            raise RuntimeError("simulated crash before artifact commit")
+        return original(db, execution_id, artifacts)
+
+    monkeypatch.setattr(svc, "persist_artifacts", exploding_persist)
+    fake_runner.set_completed(stdout="hi\n",
+                              artifacts=[_art("out.txt", _b64_bytes(b"data"))])
+    # TestClient re-raises the server error (a real server would render a 500);
+    # the point is that the failure surfaces instead of silently dropping data.
+    with pytest.raises(RuntimeError, match="simulated crash"):
+        client.post("/executions", json={"code": "pass"}, headers=headers)
+
+    # the execution row itself survived and lists cleanly with no artifacts
+    body = client.get("/executions", headers=headers).json()
+    assert len(body["executions"]) == 1
+    assert body["executions"][0]["artifact_count"] == 0
+    detail = client.get(f"/executions/{body['executions'][0]['id']}",
+                        headers=headers).json()
+    assert detail["status"] == "completed"
+    assert detail["artifacts"] == []
+
+
+def test_concurrent_history_writes_and_reads_do_not_conflict(
+    client, key_and_header, fake_runner, engine
+):
+    """Parallel runs against one key while another reader lists history:
+    every run persists exactly one execution and every read sees a
+    consistent (possibly partial) snapshot — no crashes, no torn rows."""
+    import threading
+
+    _, headers = key_and_header
+    reader_stop = threading.Event()
+    reader_errors: list[str] = []
+    run_errors: list[str] = []
+
+    def reader():
+        while not reader_stop.is_set():
+            resp = client.get("/executions?limit=100", headers=headers)
+            if resp.status_code != 200:
+                reader_errors.append(f"{resp.status_code}: {resp.text[:100]}")
+                continue
+            rows = resp.json()["executions"]
+            # every visible row must be internally consistent
+            for r in rows:
+                if r["status"] not in ("completed", "failed", "timeout",
+                                       "solari_unconfigured", "solari_unavailable"):
+                    reader_errors.append(f"torn row: {r}")
+
+    barrier = threading.Barrier(4)
+
+    def runner(n):
+        barrier.wait()
+        resp = client.post("/executions", json={"code": f"print({n})"},
+                           headers=headers)
+        if resp.status_code != 200:
+            run_errors.append(f"{resp.status_code}: {resp.text[:100]}")
+
+    reader_thread = threading.Thread(target=reader)
+    reader_thread.start()
+    run_threads = [threading.Thread(target=runner, args=(n,)) for n in range(4)]
+    for t in run_threads:
+        t.start()
+    for t in run_threads:
+        t.join()
+    reader_stop.set()
+    reader_thread.join()
+
+    assert run_errors == [] and reader_errors == []
+    body = client.get("/executions?limit=100", headers=headers).json()
+    assert len(body["executions"]) == 4  # all runs persisted, none lost
+    assert all(r["status"] == "completed" for r in body["executions"])
