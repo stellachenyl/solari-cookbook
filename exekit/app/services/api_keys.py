@@ -60,13 +60,20 @@ def create_api_key(
     return api_key, raw_key
 
 
-def get_api_key_by_raw_key(db: DBSession, raw_key: str) -> ApiKey | None:
-    """Hash-lookup. Inactive keys are rejected (returned as None) so they
-    authenticate exactly like unknown keys."""
-    if not raw_key:
+def get_api_key_by_hash(db: DBSession, key_hash: str) -> ApiKey | None:
+    """Row lookup by hash, regardless of active state. Auth decides whether an
+    inactive key is 403 (api_key_inactive) vs 401 (invalid_api_key) — the
+    service must not collapse the distinction."""
+    if not key_hash:
         return None
-    statement = select(ApiKey).where(ApiKey.key_hash == hash_api_key(raw_key))
-    api_key = db.exec(statement).first()
+    statement = select(ApiKey).where(ApiKey.key_hash == key_hash)
+    return db.exec(statement).first()
+
+
+def get_api_key_by_raw_key(db: DBSession, raw_key: str) -> ApiKey | None:
+    """Hash-lookup with inactive keys rejected (None): keys authenticate
+    exactly like unknown keys. Kept for admin scripts."""
+    api_key = get_api_key_by_hash(db, hash_api_key(raw_key))
     if api_key is None or not api_key.is_active:
         return None
     return api_key

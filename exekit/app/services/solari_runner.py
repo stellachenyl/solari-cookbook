@@ -128,15 +128,20 @@ class SolariExecutionResult(BaseModel):
     status: str
     artifacts: list[SolariArtifact] = Field(default_factory=list)
     raw: dict | None = None
+    truncated: bool = False
 
 
 # --- helpers ------------------------------------------------------------------
 
 
-def _truncate(text: str, limit: int) -> str:
+TRUNCATION_MARKER = "\n[output truncated]"
+
+
+def _truncate(text: str, limit: int) -> tuple[str, bool]:
+    """Cap output at `limit` chars; append the marker when truncated."""
     if len(text) <= limit:
-        return text
-    return text[:limit] + f"\n... [{len(text) - limit} chars truncated]"
+        return text, False
+    return text[:limit] + TRUNCATION_MARKER, True
 
 
 def _join_streams(result: Any) -> tuple[str, str]:
@@ -461,14 +466,17 @@ class SolariRunner:
             stdout, stderr = _join_streams(result)
             failed = bool(result.error)
             artifacts = await self._collect_artifacts(sandbox)
+            stdout, out_trunc = _truncate(stdout, cap)
+            stderr, err_trunc = _truncate(stderr, cap)
             return SolariExecutionResult(
-                stdout=_truncate(stdout, cap),
-                stderr=_truncate(stderr, cap),
+                stdout=stdout,
+                stderr=stderr,
                 exit_code=1 if failed else 0,
                 error=str(result.error) if failed else None,
                 status="failed" if failed else "completed",
                 artifacts=artifacts,
                 raw=_raw_view(result),
+                truncated=out_trunc or err_trunc,
             )
         finally:
             # One-shot VMs are always destroyed (example's finally: kill, line 56).
@@ -515,14 +523,17 @@ class SolariRunner:
         stdout, stderr = _join_streams(result)
         failed = bool(result.error)
         artifacts = await self._collect_artifacts(sandbox, exclude=before)
+        stdout, out_trunc = _truncate(stdout, cap)
+        stderr, err_trunc = _truncate(stderr, cap)
         return SolariExecutionResult(
-            stdout=_truncate(stdout, cap),
-            stderr=_truncate(stderr, cap),
+            stdout=stdout,
+            stderr=stderr,
             exit_code=1 if failed else 0,
             error=str(result.error) if failed else None,
             status="failed" if failed else "completed",
             artifacts=artifacts,
             raw=_raw_view(result),
+            truncated=out_trunc or err_trunc,
         )
 
     async def _session_run(

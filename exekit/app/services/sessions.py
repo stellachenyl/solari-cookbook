@@ -7,7 +7,7 @@ id is indistinguishable (None → 404) and never leaks existence.
 """
 
 import secrets
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from sqlmodel import Session as DBSession
 from sqlmodel import select
@@ -65,5 +65,14 @@ def mark_session_killed(
     return row
 
 
+def _naive_utc(dt: datetime) -> datetime:
+    """SQLite round-trips drop tzinfo; normalize to naive UTC for comparison."""
+    return dt.replace(tzinfo=None) if dt.tzinfo is not None else dt
+
+
 def is_stale(row: SandboxSession) -> bool:
-    return row.status == "active" and (utcnow() - row.last_used_at) > STALE_AFTER
+    """True when an active session has been idle past STALE_AFTER. Works for
+    rows straight from the DB (naive datetimes) and in-memory aware ones."""
+    if row.status != "active":
+        return False
+    return (_naive_utc(utcnow()) - _naive_utc(row.last_used_at)) > STALE_AFTER
