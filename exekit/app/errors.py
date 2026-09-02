@@ -95,6 +95,20 @@ class RateLimitExceeded(ExecKitError):
     default_http_status = 429
 
 
+# --- billing -------------------------------------------------------------------
+
+
+class BillingDisabled(ExecKitError):
+    default_code = "billing_disabled"
+    default_http_status = 503
+    default_message = "Stripe is not configured."
+
+    def __init__(self, message: str | None = None, *, details: dict | None = None,
+                 code: str | None = None, http_status: int | None = None):
+        super().__init__(message or self.default_message, details=details,
+                         code=code, http_status=http_status)
+
+
 # --- Solari infrastructure ------------------------------------------------------------
 
 

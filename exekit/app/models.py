@@ -53,6 +53,22 @@ class Execution(SQLModel, table=True):
     finished_at: datetime | None = None
 
 
+class StripeWebhookEvent(SQLModel, table=True):
+    """Processed Stripe webhook deliveries — the idempotency guard for credit
+    grants. One row per event id; unique constraint backs the race between
+    concurrent retries."""
+
+    __tablename__ = "stripe_webhook_events"
+
+    id: int | None = Field(default=None, primary_key=True)
+    stripe_event_id: str = Field(unique=True, index=True)
+    event_type: str
+    api_key_id: int | None = Field(default=None, foreign_key="api_keys.id")
+    credits: int | None = None
+    processed_at: datetime = Field(default_factory=utcnow)
+    payload_summary: str | None = None
+
+
 class CreditLedger(SQLModel, table=True):
     __tablename__ = "credit_ledger"
 

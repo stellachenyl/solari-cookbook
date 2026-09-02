@@ -37,8 +37,13 @@ class Settings(BaseSettings):
     session_idle_timeout_minutes: int = 30
     session_cleanup_interval_seconds: int = 300
 
-    # Billing is not implemented yet; surfaced in /health for the Stripe phase.
-    billing_enabled: bool = False
+    # Stripe credit purchases. BILLING_ENABLED is not an env var: it is
+    # derived automatically (see the property below) — true iff a secret key
+    # is configured.
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_credit_price_usd: int = 19
+    stripe_credit_amount: int = 1000
 
     @model_validator(mode="after")
     def _check_admin_token(self) -> "Settings":
@@ -49,6 +54,12 @@ class Settings(BaseSettings):
                 "(or set DEBUG=true for local development)."
             )
         return self
+
+    @property
+    def billing_enabled(self) -> bool:
+        """True iff Stripe is configured (a secret key exists). Not an env
+        var on purpose: billing can never be toggled on without credentials."""
+        return bool(self.stripe_secret_key.strip())
 
     def solari_configured(self) -> bool:
         return bool(self.solari_api_key.strip())
