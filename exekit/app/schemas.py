@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class HealthResponse(BaseModel):
@@ -86,3 +86,33 @@ class ErrorDetail(BaseModel):
 
 class ErrorResponse(BaseModel):
     error: ErrorDetail
+
+# --- billing --------------------------------------------------------------------
+
+
+class BillingConfigResponse(BaseModel):
+    billing_enabled: bool
+    credit_amount: int
+    price_usd: int
+    currency: str = "usd"
+
+
+class CheckoutRequest(BaseModel):
+    credits: Optional[int] = None
+
+
+class CheckoutResponse(BaseModel):
+    checkout_url: str
+
+
+class LedgerEntry(BaseModel):
+    amount: int
+    balance_after: int
+    reason: str
+    created_at: datetime
+
+
+class LedgerResponse(BaseModel):
+    key_last4: str
+    credits: int
+    ledger: list[LedgerEntry] = Field(default_factory=list)
