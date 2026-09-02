@@ -50,7 +50,7 @@ def get_current_api_key(
 def get_admin_token(x_admin_token: str | None = Header(default=None, alias="X-Admin-Token")) -> None:
     expected = get_settings().admin_token
     if not x_admin_token or not expected or not secrets.compare_digest(x_admin_token, expected):
-        raise InvalidAdminToken("Admin token missing or incorrect.")
+        raise InvalidAdminToken("Invalid admin token.")
 
 
 # One shared runner for the whole process: in-memory session handles must be

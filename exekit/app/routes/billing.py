@@ -70,7 +70,9 @@ _SUCCESS_PAGE = """<!DOCTYPE html>
   <h1>Payment received.</h1>
   <p>Your ExecKit credits will appear after webhook confirmation.</p>
   <p><a href="/">Back to ExecKit</a></p>
-</main></body></html>"""
+</main>
+<script>setTimeout(function () { location.replace("/?billing=success"); }, 2500);</script>
+</body></html>"""
 
 _CANCEL_PAGE = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><title>ExecKit — Payment canceled</title>
@@ -78,7 +80,9 @@ _CANCEL_PAGE = """<!DOCTYPE html>
 <body><main class="billing-page">
   <h1>Payment canceled.</h1>
   <p><a href="/">Back to ExecKit</a></p>
-</main></body></html>"""
+</main>
+<script>setTimeout(function () { location.replace("/?billing=cancel"); }, 2500);</script>
+</body></html>"""
 
 
 @router.get("/billing/success", response_class=HTMLResponse)

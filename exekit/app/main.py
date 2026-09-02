@@ -19,7 +19,7 @@ from app.errors import ExecKitError
 from app.logging_config import setup_logging
 from app.middleware.request_id import RequestIDMiddleware
 from app.schemas import ErrorDetail, ErrorResponse
-from app.routes import billing, executions, health, keys, sessions
+from app.routes import admin, billing, executions, health, keys, sessions
 
 setup_logging()
 logger = logging.getLogger("exekit")
@@ -82,12 +82,18 @@ app.include_router(health.router)
 app.include_router(keys.router)
 app.include_router(executions.router)
 app.include_router(sessions.router)
+app.include_router(admin.router)
 app.include_router(billing.router)
 
 
 @app.get("/", include_in_schema=False)
 def index() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/admin", include_in_schema=False)
+def admin_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "admin.html")
 
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

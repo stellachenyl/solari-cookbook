@@ -41,6 +41,35 @@
       </section>
 
       <section class="card">
+        <h2>Billing</h2>
+        <div class="billing-status-row">
+          <span id="billing-status" class="indicator" data-state="unknown">– billing</span>
+          <span id="billing-package" class="billing-package">1000 credits / $19</span>
+        </div>
+        <div class="balance-row">
+          <span id="billing-balance" class="balance" title="Current credit balance">–</span>
+          <span class="balance-label">credits</span>
+        </div>
+        <button id="btn-buy-credits" class="btn primary buy-btn">Buy 1000 credits</button>
+        <p class="hint">Credits are added after payment confirmation.</p>
+      </section>
+
+      <section class="card">
+        <h2>Credit history</h2>
+        <button id="btn-ledger-toggle" class="btn link-btn" aria-expanded="false">Show</button>
+        <div id="ledger-panel" class="ledger hidden">
+          <table class="ledger-table">
+            <thead>
+              <tr><th>When</th><th>Reason</th><th>Δ</th><th>Balance</th></tr>
+            </thead>
+            <tbody id="ledger-body">
+              <tr><td colspan="4" class="placeholder">No entries yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card">
         <h2>Session</h2>
         <label class="field">
           <span>Session ID</span>
