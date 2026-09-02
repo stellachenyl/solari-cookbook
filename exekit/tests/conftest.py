@@ -107,6 +107,17 @@ def client(engine, fake_runner, settings):
 
 
 @pytest.fixture()
+def stripe_enabled(settings):
+    """Stripe configured in test mode with a known webhook secret."""
+    settings.stripe_secret_key = "sk_test_fake"
+    settings.stripe_webhook_secret = "whsec_test_secret"
+    settings.stripe_credit_amount = 1000
+    settings.stripe_credit_price_usd = 19
+    settings.app_base_url = "http://localhost:8000"
+    return settings
+
+
+@pytest.fixture()
 def key_and_header(client):
     """A fresh API key (25 credits) plus its X-API-Key header."""
     resp = client.post("/keys/request", json={"email": "qa@example.com"})
