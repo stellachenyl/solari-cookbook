@@ -19,7 +19,7 @@ from app.errors import ExecKitError
 from app.logging_config import setup_logging
 from app.middleware.request_id import RequestIDMiddleware
 from app.schemas import ErrorDetail, ErrorResponse
-from app.routes import admin, billing, executions, health, keys, sessions
+from app.routes import admin, billing, executions, health, history, keys, sessions
 
 setup_logging()
 logger = logging.getLogger("exekit")
@@ -81,6 +81,7 @@ def get_runner():
 app.include_router(health.router)
 app.include_router(keys.router)
 app.include_router(executions.router)
+app.include_router(history.router)
 app.include_router(sessions.router)
 app.include_router(admin.router)
 app.include_router(billing.router)
