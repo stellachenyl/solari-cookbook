@@ -11,6 +11,8 @@ Failures raise domain errors (app/errors.py) that main.py renders as the
 standard error envelope. No HTTP primitives in this module.
 """
 
+import base64
+import binascii
 import logging
 
 from sqlmodel import Session as DBSession
@@ -18,8 +20,8 @@ from sqlmodel import Session as DBSession
 from app.config import get_settings
 from app.dependencies import get_runner
 from app.errors import ExecKitError, InsufficientCredits, InvalidSession, SessionKilled, SolariNotConfigured, SolariUnavailable
-from app.models import ApiKey, Execution, SandboxSession, utcnow
-from app.schemas import ExecutionResponse
+from app.models import ApiKey, Execution, ExecutionArtifact, SandboxSession, utcnow
+from app.schemas import ArtifactMeta, ExecutionResponse
 from app.services import sessions as sessions_service
 from app.services.quota import consume_credit, refund_credit
 from app.services.solari_runner import SolariRunner
@@ -27,6 +29,7 @@ from app.services.solari_runner import SolariRunner
 logger = logging.getLogger("exekit.executions")
 
 MAX_CODE_LENGTH = 50_000
+MAX_STORED_ARTIFACT_CHARS = 100_000  # larger artifacts keep metadata only
 
 # Solari infrastructure outcomes: the credit is refunded and the client gets
 # the matching domain error. User-code outcomes (completed/failed/timeout)
@@ -64,6 +67,73 @@ def _resolve_session(
 
 def session_row_status(row: SandboxSession) -> str:
     return row.status
+
+
+def persist_artifacts(
+    db: DBSession, execution_id: int, artifacts: list
+) -> list[ExecutionArtifact]:
+    """Persist runner artifacts for an execution.
+
+    Small text artifacts (<= MAX_STORED_ARTIFACT_CHARS decoded characters)
+    are stored inline in data_text; everything else — oversized text,
+    binaries, undecodable payloads — keeps metadata only. The base64 wire
+    data is never written to the database.
+    """
+    stored: list[ExecutionArtifact] = []
+    for art in artifacts:
+        size_bytes = 0
+        data_text: str | None = None
+        try:
+            raw = (
+                base64.b64decode(art.data)
+                if art.encoding == "base64"
+                else art.data.encode("utf-8")
+            )
+            size_bytes = len(raw)
+        except (binascii.Error, ValueError, AttributeError) as exc:
+            logger.warning(
+                "artifact %s (execution %d) undecodable: %s",
+                art.filename, execution_id, exc,
+            )
+            raw = None
+        if raw is not None and size_bytes <= MAX_STORED_ARTIFACT_CHARS:
+            try:
+                data_text = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                logger.info(
+                    "artifact %s (execution %d) is binary; storing metadata only",
+                    art.filename, execution_id,
+                )
+        row = ExecutionArtifact(
+            execution_id=execution_id,
+            filename=art.filename,
+            path=art.path,
+            mime_type=art.mime_type,
+            encoding=art.encoding,
+            size_bytes=size_bytes,
+            data_text=data_text,
+            created_at=utcnow(),
+        )
+        db.add(row)
+        stored.append(row)
+    db.commit()
+    for row in stored:
+        db.refresh(row)
+    return stored
+
+
+def _artifact_meta(rows: list[ExecutionArtifact]) -> list[ArtifactMeta]:
+    return [
+        ArtifactMeta(
+            id=row.id,
+            filename=row.filename,
+            mime_type=row.mime_type,
+            encoding=row.encoding,
+            size_bytes=row.size_bytes,
+            download_available=row.data_text is not None,
+        )
+        for row in rows
+    ]
 
 
 async def execute_code(
@@ -153,6 +223,7 @@ async def execute_code(
         "execution finished id=%d status=%s key_last4=%s credits_left=%d",
         execution.id, result.status, api_key.key_last4, api_key.credits,
     )
+    artifact_rows = persist_artifacts(db, execution.id, result.artifacts)
     return ExecutionResponse(
         execution_id=execution.id,
         session_id=session_id,
@@ -161,7 +232,7 @@ async def execute_code(
         exit_code=result.exit_code,
         status=result.status,
         error=result.error,
-        artifacts=[a.model_dump() for a in result.artifacts],
+        artifacts=_artifact_meta(artifact_rows),
         credits_remaining=api_key.credits,
         truncated=result.truncated,
     )

@@ -1,11 +1,10 @@
 """Route tests for POST /executions: validation, quota, persistence, refunds,
 session routing, and the lost-session path."""
 
-import base64
 
 from sqlmodel import Session as DBSession, select
 
-from app.models import CreditLedger, Execution, SandboxSession
+from app.models import CreditLedger, Execution, ExecutionArtifact, SandboxSession
 from app.services.errors import SolariUnavailable
 
 
@@ -84,7 +83,20 @@ def test_happy_path_debits_persists_and_reports(client, key_and_header, fake_run
     assert body["execution_id"] == 1 and body["session_id"] is None
     assert body["credits_remaining"] == 24
     assert body["artifacts"][0]["filename"] == "out.txt"
-    assert base64.b64decode(body["artifacts"][0]["data"]) == b"data"
+    meta = body["artifacts"][0]
+    assert meta["mime_type"] == "text/plain"
+    assert meta["encoding"] == "base64"
+    assert meta["size_bytes"] == 4
+    assert meta["download_available"] is True
+    assert "data" not in meta  # base64 wire data is never echoed back
+
+    with DBSession(engine) as db:
+        row = db.get(Execution, body["execution_id"])
+        stored = db.exec(
+            select(ExecutionArtifact).where(ExecutionArtifact.execution_id == row.id)
+        ).one()
+        assert stored.filename == "out.txt" and stored.size_bytes == 4
+        assert stored.data_text == "data"  # small text artifact kept inline
     assert fake_runner.runs == [("print('hi')", None)]
 
     with DBSession(engine) as db:
