@@ -1,4 +1,4 @@
-"""Session lifecycle endpoints (docs/EXEKIT_SPEC.md §F)."""
+"""Thin session routes: lifecycle + file access, logic in services."""
 
 import logging
 
@@ -6,21 +6,17 @@ from fastapi import APIRouter, Depends, Response
 from sqlmodel import Session as DBSession
 
 from app.dependencies import (
-    ApiError,
     get_current_api_key,
     get_db,
     get_runner,
     get_session_row,
+    require_sessions_rate_limit,
 )
+from app.errors import InvalidRequest, NotFound
 from app.models import ApiKey, SandboxSession
 from app.schemas import SessionResponse
 from app.services import sessions as sessions_service
-from app.services.errors import (
-    SolariNotConfigured,
-    SolariTimeout,
-    SolariUnavailable,
-    UnsupportedSolariCapability,
-)
+from app.errors import ExecKitError
 from app.services.solari_runner import SolariRunner
 
 logger = logging.getLogger("exekit.sessions")
@@ -32,20 +28,16 @@ async def create_session(
     db: DBSession = Depends(get_db),
     api_key: ApiKey = Depends(get_current_api_key),
     runner: SolariRunner = Depends(get_runner),
+    _rl=Depends(require_sessions_rate_limit),
 ) -> SessionResponse:
     """Create a Solari sandbox + kernel context and record it.
 
     If the sandbox record write fails the sandbox is killed immediately, so a
-    billing error can't leak an untracked VM.
+    storage error can't leak an untracked VM.
     """
-    try:
-        solari_id = await runner.create_session(api_key_id=api_key.id)
-    except SolariNotConfigured as exc:
-        raise ApiError(503, "solari_unconfigured", str(exc))
-    except SolariTimeout as exc:
-        raise ApiError(504, "solari_timeout", str(exc))
-    except SolariUnavailable as exc:
-        raise ApiError(503, "solari_unavailable", str(exc))
+    # Domain errors from the runner (not configured / timeout / unavailable)
+    # propagate as-is; main.py renders them with their HTTP statuses.
+    solari_id = await runner.create_session(api_key_id=api_key.id)
 
     try:
         row = sessions_service.create_session_record(
@@ -54,9 +46,9 @@ async def create_session(
     except Exception:
         logger.exception("session record write failed; killing orphan sandbox %s", solari_id)
         await runner.kill_session(solari_id)
-        raise ApiError(500, "internal", "Could not record the new session.")
+        raise ExecKitError("Could not record the new session.", code="internal", http_status=500)
 
-    logger.info("session %s created for key last4=%s", row.id, api_key.key_last4)
+    logger.info("session created session_id=%s key_last4=%s", row.id, api_key.key_last4)
     return SessionResponse(session_id=row.id, status=row.status)
 
 
@@ -83,7 +75,7 @@ async def delete_session(
         # Handle lost (e.g. process restart): fall back to the client-side kill.
         await runner.kill_by_sandbox_id(row.solari_session_id)
     sessions_service.mark_session_killed(db, row)
-    logger.info("session %s killed (runner_handle=%s)", row.id, killed)
+    logger.info("session killed session_id=%s (runner_handle=%s)", row.id, killed)
     return SessionResponse(session_id=row.id, status=row.status)
 
 
@@ -97,22 +89,16 @@ async def read_session_file(
 
     Traversal is rejected up front (no separators, no dot names); the runner
     reads only inside its configured artifact directory. Unknown files are
-    404; an unreadable Solari backend is 503.
+    404; an unreadable Solari backend maps to the standard Solari errors.
     """
     if "/" in filename or "\\" in filename or filename in (".", ".."):
-        raise ApiError(400, "invalid_request", "Invalid filename.")
+        raise InvalidRequest("Invalid filename.")
     try:
-        content = await runner.read_file(row.solari_session_id, f"{runner.artifact_dir}/{filename}")
+        content = await runner.read_file(
+            row.solari_session_id, f"{runner.artifact_dir}/{filename}"
+        )
     except KeyError:
-        raise ApiError(404, "not_found", f"No file {filename} in session {row.id}.")
-    except UnsupportedSolariCapability as exc:
-        raise ApiError(501, "unsupported_capability", str(exc))
-    except SolariUnavailable as exc:
-        raise ApiError(503, "solari_unavailable", str(exc))
-    except SolariNotConfigured as exc:
-        raise ApiError(503, "solari_unconfigured", str(exc))
-    except SolariTimeout as exc:
-        raise ApiError(504, "solari_timeout", str(exc))
+        raise NotFound(f"No file {filename} in session {row.id}.")
     return Response(
         content=content.encode("utf-8"),
         media_type="application/octet-stream",
