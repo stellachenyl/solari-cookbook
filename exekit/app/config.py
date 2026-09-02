@@ -28,6 +28,18 @@ class Settings(BaseSettings):
     free_credits: int = 25
     max_output_chars: int = 100_000
 
+    # Rate limits (per API key, per minute; <= 0 disables a bucket).
+    rate_limit_executions_per_minute: int = 30
+    rate_limit_sessions_per_minute: int = 10
+    rate_limit_requests_per_minute: int = 100
+
+    # Idle-session cleanup.
+    session_idle_timeout_minutes: int = 30
+    session_cleanup_interval_seconds: int = 300
+
+    # Billing is not implemented yet; surfaced in /health for the Stripe phase.
+    billing_enabled: bool = False
+
     @model_validator(mode="after")
     def _check_admin_token(self) -> "Settings":
         # Fail fast on a missing production admin token; DEBUG builds may omit it.
