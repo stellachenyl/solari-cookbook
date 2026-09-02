@@ -19,7 +19,7 @@ from sqlmodel import Session as DBSession
 from sqlmodel import select
 
 from app.config import get_settings
-from app.errors import ExecKitError
+from app.errors import BillingDisabled, ExecKitError
 from app.models import ApiKey, StripeWebhookEvent
 from app.services.quota import add_credits
 
@@ -102,9 +102,22 @@ def _event_to_dict(event) -> dict:
 
 def _extract_checkout_info(event: dict) -> dict | None:
     """(api_key_id, credits, summary) from a checkout.session.completed event,
-    or None when the payload is not usable (logged and ignored by the caller)."""
+    or None when the payload is not usable (logged and ignored by the caller).
+
+    A session only qualifies for a grant when Stripe reports the money as
+    collected (payment_status == "paid"): async payment methods (SEPA/ACH)
+    deliver checkout.session.completed while the charge is still pending, and
+    granting on those would hand out credits for uncollected money.
+    """
     data_object = (event.get("data") or {}).get("object") or {}
     metadata = data_object.get("metadata") or {}
+    payment_status = data_object.get("payment_status")
+    if payment_status != "paid":
+        logger.warning(
+            "checkout event %s payment_status=%r is not 'paid'; ignoring",
+            event.get("id", "?"), payment_status,
+        )
+        return None
     try:
         api_key_id = int(metadata.get("api_key_id", ""))
         credits = int(metadata.get("credits", ""))
@@ -130,7 +143,6 @@ def _extract_checkout_info(event: dict) -> dict | None:
         )
         return None
     amount_total = data_object.get("amount_total")
-    payment_status = data_object.get("payment_status")
     return {
         "api_key_id": api_key_id,
         "credits": credits,
