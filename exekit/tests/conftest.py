@@ -68,6 +68,17 @@ def runner(monkeypatch, settings):
     return make_runner(monkeypatch, settings)
 
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    """The limiter is process-global; tests create keys with colliding ids on
+    fresh databases, so its window must be cleared around every test."""
+    from app.services import rate_limit as rl
+
+    rl.get_limiter().reset()
+    yield
+    rl.get_limiter().reset()
+
+
 @pytest.fixture()
 def fake_runner():
     from tests.fakes import FakeSolariRunner

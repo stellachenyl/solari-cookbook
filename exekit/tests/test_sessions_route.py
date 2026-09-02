@@ -63,14 +63,14 @@ def test_create_session_maps_infra_errors(client, key_and_header, monkeypatch):
     monkeypatch.setitem(client.app.dependency_overrides, deps.get_runner,
                         lambda: _runner_raises(SolariUnavailable("capacity")))
     resp = client.post("/sessions", headers=headers)
-    assert resp.status_code == 503
+    assert resp.status_code == 502
     assert resp.json()["error"]["code"] == "solari_unavailable"
 
     monkeypatch.setitem(client.app.dependency_overrides, deps.get_runner,
                         lambda: _runner_raises(SolariTimeout("slow")))
     resp = client.post("/sessions", headers=headers)
     assert resp.status_code == 504
-    assert resp.json()["error"]["code"] == "solari_timeout"
+    assert resp.json()["error"]["code"] == "execution_timeout"
 
 
 def test_get_session_bumps_last_used(client, sess, engine):

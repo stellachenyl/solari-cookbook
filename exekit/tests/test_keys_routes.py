@@ -30,7 +30,7 @@ def test_request_key_accepts_optional_email(client):
 
 def test_request_key_rejects_malformed_email(client):
     resp = client.post("/keys/request", json={"email": "not-an-email"})
-    assert resp.status_code == 400
+    assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "invalid_request"
 
 
@@ -58,13 +58,10 @@ def test_me_rejects_unknown_key(client):
     assert resp.json()["error"]["code"] == "invalid_api_key"
 
 
-@pytest.mark.xfail(reason="BUG-1: service collapses inactive keys into None, so the "
-                           "dependency cannot distinguish 403 from 401; see QA report",
-                   strict=True)
 def test_me_rejects_inactive_key_with_403(client, engine):
-    """Spec (route brief section 3): inactive keys must answer 403
+    """Spec (route brief section 3): inactive keys answer 403
     api_key_inactive so owners can distinguish 'deactivated by admin' from
-    'typo in the key'. Currently answers 401 invalid_api_key."""
+    'typo in the key' (BUG-1 fixed)."""
     raw = client.post("/keys/request", json={}).json()["api_key"]
     with DBSession(engine) as db:
         key = db.exec(select(ApiKey)).first()

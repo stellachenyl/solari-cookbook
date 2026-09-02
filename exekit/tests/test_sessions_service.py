@@ -66,12 +66,10 @@ def test_is_stale_semantics_with_in_memory_aware_datetimes():
     assert svc.is_stale(fresh) is False  # terminal states never go stale
 
 
-@pytest.mark.xfail(reason="BUG-2: is_stale subtracts offset-naive (SQLite round-trip) "
-                          "from offset-aware utcnow() and raises TypeError for every "
-                          "DB-loaded row; see QA report", strict=True)
 def test_is_stale_on_db_loaded_row(db):
-    """The shape the future reaper will actually pass in: a row straight from
-    the DB (SQLite drops tzinfo -> naive datetimes). Must not crash."""
+    """Regression (BUG-2, fixed): rows straight from the DB carry naive
+    datetimes; is_stale must not crash on them. The cleanup task depends on
+    this."""
     row = make(db)
     db.refresh(row)  # round-trip through SQLite -> naive datetimes
     assert svc.is_stale(row) is False

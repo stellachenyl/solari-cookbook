@@ -32,7 +32,7 @@ def test_root_serves_playground(client):
 def test_validation_errors_use_the_envelope(client, key_and_header):
     _, headers = key_and_header
     resp = client.post("/executions", json={"code": 5}, headers=headers)
-    assert resp.status_code == 400
+    assert resp.status_code == 422
     body = resp.json()
     assert body["error"]["code"] == "invalid_request"
     assert isinstance(body["error"]["details"], dict)
@@ -62,10 +62,10 @@ def test_unhandled_exception_returns_envelope_without_traceback(client):
 
 
 def test_debug_mode_includes_exception_type(client, monkeypatch):
-    # main.py binds the settings instance at import time; patch that one.
-    import app.main as main_module
+    # main.py reads debug via get_settings(); patch the live instance.
+    from app.config import get_settings
 
-    monkeypatch.setattr(main_module.settings, "debug", True)
+    monkeypatch.setattr(get_settings(), "debug", True)
     resp = _raise_in_auth(client)
     assert resp.status_code == 500
     assert "RuntimeError" in resp.json()["error"]["message"]

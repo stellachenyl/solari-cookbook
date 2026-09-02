@@ -25,16 +25,16 @@ def test_empty_code_rejected_before_any_side_effect(client, key_and_header, fake
     _, headers = key_and_header
     for code in ("", "   \n  "):
         resp = client.post("/executions", json={"code": code}, headers=headers)
-        assert resp.status_code == 400
-        assert resp.json()["error"]["code"] == "empty_code"
+        assert resp.status_code == 422
+        assert resp.json()["error"]["code"] == "invalid_request"
     assert fake_runner.runs == []  # nothing was dispatched
 
 
 def test_oversized_code_rejected(client, key_and_header, fake_runner):
     _, headers = key_and_header
     resp = client.post("/executions", json={"code": "x" * 50001}, headers=headers)
-    assert resp.status_code == 400
-    assert resp.json()["error"]["code"] == "code_too_long"
+    assert resp.status_code == 422
+    assert resp.json()["error"]["code"] == "invalid_request"
     assert fake_runner.runs == []
 
 
@@ -48,7 +48,7 @@ def test_boundary_code_length_is_admitted(client, key_and_header, fake_runner):
 def test_non_string_code_maps_to_invalid_request(client, key_and_header):
     _, headers = key_and_header
     resp = client.post("/executions", json={"code": 5}, headers=headers)
-    assert resp.status_code == 400
+    assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "invalid_request"
 
 
@@ -63,8 +63,8 @@ def test_insufficient_credits_is_402_and_free(client, key_and_header, engine):
     assert err["code"] == "insufficient_credits"
     assert err["details"]["credits_remaining"] == 0
     with DBSession(engine) as db:
-        key = db.exec(select(Execution)).all()
-        assert key == []  # no execution row for a refused run
+        rows = db.exec(select(Execution)).all()
+        assert rows == []  # no execution row for a refused run
 
 
 def test_happy_path_debits_persists_and_reports(client, key_and_header, fake_runner, engine):
@@ -123,11 +123,11 @@ def test_timeout_is_200_and_not_refunded(client, key_and_header, fake_runner):
     assert resp.json()["credits_remaining"] == 24
 
 
-def test_solari_unavailable_is_503_with_refund(client, key_and_header, fake_runner, engine):
+def test_solari_unavailable_is_502_with_refund(client, key_and_header, fake_runner, engine):
     fake_runner.set_status("solari_unavailable", error="gateway down")
     _, headers = key_and_header
     resp = client.post("/executions", json={"code": "print(1)"}, headers=headers)
-    assert resp.status_code == 503
+    assert resp.status_code == 502
     err = resp.json()["error"]
     assert err["code"] == "solari_unavailable"
     assert err["details"]["credits_remaining"] == 25
@@ -187,7 +187,7 @@ def test_killed_session_execution_is_410(client, key_and_header):
     resp = client.post("/executions", json={"code": "print(1)", "session_id": sess},
                        headers=headers)
     assert resp.status_code == 410
-    assert resp.json()["error"]["code"] == "invalid_session"
+    assert resp.json()["error"]["code"] == "session_gone"
 
 
 def test_lost_runner_handle_marks_session_lost_and_refunds(
@@ -199,7 +199,7 @@ def test_lost_runner_handle_marks_session_lost_and_refunds(
     resp = client.post("/executions", json={"code": "print(1)", "session_id": sess},
                        headers=headers)
     assert resp.status_code == 410
-    assert resp.json()["error"]["code"] == "invalid_session"
+    assert resp.json()["error"]["code"] == "session_gone"
     with DBSession(engine) as db:
         row = db.get(SandboxSession, sess)
         assert row.status == "lost" and row.killed_at is not None
