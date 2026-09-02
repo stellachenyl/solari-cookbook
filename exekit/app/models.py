@@ -53,6 +53,28 @@ class Execution(SQLModel, table=True):
     finished_at: datetime | None = None
 
 
+class ExecutionArtifact(SQLModel, table=True):
+    """A file produced by an execution.
+
+    Small text artifacts are stored inline (data_text, decoded); larger ones
+    keep metadata only (data_text NULL, download_available false). Binary
+    blobs are never persisted. The original base64 wire form is reconstruct-
+    ible from data_text when present.
+    """
+
+    __tablename__ = "execution_artifacts"
+
+    id: int | None = Field(default=None, primary_key=True)
+    execution_id: int = Field(foreign_key="executions.id", index=True)
+    filename: str
+    path: str | None = None
+    mime_type: str | None = None
+    encoding: str = "base64"
+    size_bytes: int
+    data_text: str | None = None
+    created_at: datetime = Field(default_factory=utcnow)
+
+
 class StripeWebhookEvent(SQLModel, table=True):
     """Processed Stripe webhook deliveries — the idempotency guard for credit
     grants. One row per event id; unique constraint backs the race between

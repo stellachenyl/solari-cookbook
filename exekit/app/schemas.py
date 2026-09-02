@@ -60,6 +60,17 @@ class ExecutionRequest(BaseModel):
         return v
 
 
+class ArtifactMeta(BaseModel):
+    """Artifact metadata as attached to execution responses/history."""
+
+    id: int
+    filename: str
+    mime_type: Optional[str] = None
+    encoding: str = "base64"
+    size_bytes: int
+    download_available: bool = False
+
+
 class ExecutionResponse(BaseModel):
     execution_id: int
     session_id: Optional[str] = None
@@ -68,7 +79,7 @@ class ExecutionResponse(BaseModel):
     exit_code: Optional[int] = None
     status: str
     error: Optional[str] = None
-    artifacts: list = []
+    artifacts: list[ArtifactMeta] = []
     credits_remaining: int
     truncated: bool = False
 
@@ -116,3 +127,43 @@ class LedgerResponse(BaseModel):
     key_last4: str
     credits: int
     ledger: list[LedgerEntry] = Field(default_factory=list)
+
+# --- execution history / artifacts -------------------------------------------------
+
+MAX_STORED_ARTIFACT_CHARS = 100_000
+
+
+class HistoryExecution(BaseModel):
+    id: int
+    session_id: Optional[str] = None
+    status: str
+    exit_code: Optional[int] = None
+    created_at: datetime
+    finished_at: Optional[datetime] = None
+    artifact_count: int = 0
+
+
+class HistoryResponse(BaseModel):
+    executions: list[HistoryExecution] = Field(default_factory=list)
+    limit: int
+    offset: int
+
+
+class ExecutionDetailResponse(BaseModel):
+    id: int
+    session_id: Optional[str] = None
+    status: str
+    exit_code: Optional[int] = None
+    stdout: Optional[str] = None
+    stderr: Optional[str] = None
+    error: Optional[str] = None
+    created_at: datetime
+    finished_at: Optional[datetime] = None
+    code: Optional[str] = None  # only when include_code=true
+    duration_ms: Optional[int] = None
+    artifacts: list[ArtifactMeta] = Field(default_factory=list)
+
+
+class ExecutionArtifactsResponse(BaseModel):
+    execution_id: int
+    artifacts: list[ArtifactMeta] = Field(default_factory=list)
