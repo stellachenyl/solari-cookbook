@@ -261,3 +261,89 @@ input:focus, textarea:focus {
   .layout { padding: 12px 16px; }
   .foot { padding: 10px 16px; }
 }
+
+/* ---------------- billing ---------------- */
+
+.billing-status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.billing-package {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.balance-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
+
+.balance {
+  font-family: var(--mono);
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text);
+}
+.balance[data-state="ok"] { color: var(--green); }
+.balance[data-state="empty"] { color: var(--red); }
+
+.balance-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.buy-btn { width: 100%; justify-content: center; }
+
+.btn.link-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  padding: 0 0 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.btn.link-btn:hover { text-decoration: underline; background: none; border: none; }
+
+.ledger { overflow-x: auto; }
+.ledger.hidden { display: none; }
+
+.ledger-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.ledger-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+  padding: 4px 8px 4px 0;
+}
+.ledger-table td {
+  padding: 4px 8px 4px 0;
+  border-bottom: 1px solid var(--border-soft);
+  color: #cdd6e4;
+  white-space: nowrap;
+}
+.ledger-table .placeholder { color: var(--text-dim); }
+.ledger-plus { color: var(--green); }
+.ledger-minus { color: var(--red); }
+
+/* success / cancel banner variants */
+.banner.success {
+  background: color-mix(in srgb, var(--green) 12%, transparent);
+  border-color: color-mix(in srgb, var(--green) 45%, transparent);
+  color: #a7f3d0;
+}
+.banner.cancel {
+  background: color-mix(in srgb, var(--amber) 10%, transparent);
+  border-color: color-mix(in srgb, var(--amber) 40%, transparent);
+  color: #fde68a;
+}
