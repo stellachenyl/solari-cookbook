@@ -30,13 +30,31 @@ const els = {
   meta: $("exec-meta"),
   banner: $("banner"),
   artifacts: $("artifacts"),
+  history: $("history"),
+  historyMeta: $("history-meta"),
+  execDetail: $("exec-detail"),
+  execDetailTitle: $("exec-detail-title"),
+  execDetailMeta: $("exec-detail-meta"),
+  detailStatus: $("detail-status"),
+  detailStdout: $("detail-stdout"),
+  detailStderr: $("detail-stderr"),
+  detailError: $("detail-error"),
+  detailPreview: $("detail-preview"),
+  detailPreviewBody: $("detail-preview-body"),
+  detailArtifacts: $("detail-artifacts"),
+  closeDetail: $("btn-close-detail"),
 };
 
 const MAX_PREVIEW_BYTES = 64 * 1024; // artifacts above this are download-only
 const POST_STRIPE_POLLS = 5;         // /keys/me checks after returning from Stripe
 const POST_STRIPE_POLL_MS = 3000;
+const HISTORY_PAGE_SIZE = 10;        // executions shown in the history panel
 
 let billingConfig = null;            // last /billing/config payload
+
+// The execution currently open in the detail modal; artifact downloads and
+// previews resolve against it.
+let detailExecution = null;
 
 function apiKey() {
   return els.keyInput.value.trim();
@@ -137,6 +155,7 @@ async function getKey() {
     saveKey(body.api_key);
     setIndicators(body.credits, body.plan);
     loadLedger(); // new key: show its (grant-only) history
+    loadHistory();
     showBanner("info", `New key …${body.key_last4} saved locally. It is shown only once — store it somewhere safe.`);
   } catch (err) {
     showBanner("error", err.message);
@@ -151,6 +170,7 @@ async function loadInfo() {
   try {
     const me = await apiFetch("/keys/me");
     setIndicators(me.credits, me.plan);
+    loadHistory();
     showBanner("info", `Key …${me.key_last4}: ${me.executions_count} execution${me.executions_count === 1 ? "" : "s"} on record.`
       + (me.is_active ? "" : " (INACTIVE)"));
   } catch (err) {
@@ -344,6 +364,229 @@ function handleStripeReturn() {
   return false;
 }
 
+// --- execution history & artifacts ------------------------------------------------
+// Artifact content is never trusted as markup: everything dynamic is rendered
+// via textContent, no eval, no innerHTML with artifact-derived strings.
+
+function formatBytes(n) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatWhen(iso) {
+  const when = new Date(iso + (iso.endsWith("Z") ? "" : "Z"));
+  return Number.isNaN(when.getTime()) ? iso : when.toLocaleString();
+}
+
+// Authenticated artifact fetch: the download endpoint requires X-API-Key, so a
+// plain <a href> cannot work — the content is fetched and saved as a blob.
+async function fetchArtifact(executionId, artifactId) {
+  const resp = await fetch(
+    `/executions/${executionId}/artifacts/${artifactId}/download`,
+    { headers: { "X-API-Key": apiKey() } },
+  );
+  if (!resp.ok) {
+    let code = `HTTP ${resp.status}`;
+    try {
+      const body = await resp.json();
+      if (body && body.error && body.error.code) code = body.error.code;
+    } catch { /* non-JSON error body */ }
+    const message = code === "artifact_not_stored"
+      ? "Artifact content was not stored (too large or binary)."
+      : `Download failed (${code})`;
+    throw new Error(message);
+  }
+  return resp;
+}
+
+// Status line inside the detail modal. Errors also surface as the main banner
+// when the modal is closed (e.g. downloads started from the run output).
+function setDetailStatus(text, isError = false) {
+  els.detailStatus.textContent = text;
+  els.detailStatus.classList.toggle("status-error", Boolean(isError));
+  if (isError && els.execDetail.classList.contains("hidden")) showBanner("error", text);
+}
+
+async function downloadArtifact(executionId, art) {
+  try {
+    const resp = await fetchArtifact(executionId, art.id);
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = art.filename || "artifact.txt";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    setDetailStatus("");
+  } catch (err) {
+    setDetailStatus(err.message, true);
+  }
+}
+
+// Preview is text-only by design: text/* mimes, stored content only, capped
+// size. The response body is already decoded server-side; nothing is executed.
+async function previewArtifact(executionId, art) {
+  els.detailPreviewBody.textContent = `Loading ${art.filename}…`;
+  els.detailPreview.classList.remove("hidden");
+  try {
+    const resp = await fetchArtifact(executionId, art.id);
+    const text = await resp.text();
+    els.detailPreviewBody.textContent = text;
+  } catch (err) {
+    els.detailPreviewBody.textContent = err.message;
+  }
+}
+
+function canPreview(art) {
+  return Boolean(art.download_available)
+    && typeof art.mime_type === "string"
+    && art.mime_type.startsWith("text/")
+    && art.size_bytes <= MAX_PREVIEW_BYTES;
+}
+
+function renderArtifacts(container, artifacts, executionId, { preview = false } = {}) {
+  container.textContent = "";
+  if (!artifacts || artifacts.length === 0) {
+    const span = document.createElement("span");
+    span.className = "placeholder";
+    span.textContent = "No artifacts in this run.";
+    container.appendChild(span);
+    return;
+  }
+  for (const art of artifacts) {
+    const row = document.createElement("div");
+    row.className = "artifact";
+    const name = document.createElement("span");
+    name.className = "artifact-name";
+    name.textContent =
+      `${art.filename} · ${formatBytes(art.size_bytes)} · ${art.mime_type || "unknown type"}`;
+    const actions = document.createElement("span");
+    actions.className = "artifact-actions";
+    if (art.download_available) {
+      const dl = document.createElement("a");
+      dl.href = "#";
+      dl.textContent = "download";
+      dl.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        downloadArtifact(executionId, art);
+      });
+      actions.appendChild(dl);
+      if (preview && canPreview(art)) {
+        actions.appendChild(document.createTextNode(" · "));
+        const pv = document.createElement("a");
+        pv.href = "#";
+        pv.textContent = "preview";
+        pv.addEventListener("click", (ev) => {
+          ev.preventDefault();
+          previewArtifact(executionId, art);
+        });
+        actions.appendChild(pv);
+      }
+    } else {
+      actions.textContent = "not stored (too large or binary)";
+    }
+    row.appendChild(name);
+    row.appendChild(actions);
+    container.appendChild(row);
+  }
+}
+
+function renderHistoryPlaceholder(text) {
+  els.history.textContent = "";
+  const span = document.createElement("span");
+  span.className = "placeholder";
+  span.textContent = text;
+  els.history.appendChild(span);
+  els.historyMeta.textContent = "";
+}
+
+async function loadHistory() {
+  if (!apiKey()) {
+    renderHistoryPlaceholder("Enter an API key to see your recent executions.");
+    return;
+  }
+  try {
+    const body = await apiFetch(`/executions?limit=${HISTORY_PAGE_SIZE}&offset=0`);
+    renderHistory(body.executions || []);
+  } catch (err) {
+    renderHistoryPlaceholder(`History unavailable: ${err.message}`);
+  }
+}
+
+function renderHistory(executions) {
+  els.history.textContent = "";
+  if (executions.length === 0) {
+    renderHistoryPlaceholder("No executions yet — run some code!");
+    return;
+  }
+  els.historyMeta.textContent = `latest ${executions.length}`;
+  for (const e of executions) {
+    const row = document.createElement("div");
+    row.className = "history-row";
+
+    const id = document.createElement("span");
+    id.className = "history-id";
+    id.textContent = `#${e.id}`;
+
+    const status = document.createElement("span");
+    status.className = `history-status status-${e.status}`;
+    status.textContent = e.status;
+
+    const when = document.createElement("span");
+    when.className = "history-when";
+    when.textContent = e.created_at ? formatWhen(e.created_at) : "";
+
+    const arts = document.createElement("span");
+    arts.className = "history-count";
+    arts.textContent = `${e.artifact_count} artifact${e.artifact_count === 1 ? "" : "s"}`;
+
+    const view = document.createElement("button");
+    view.className = "btn btn-small";
+    view.textContent = "View";
+    view.addEventListener("click", () => viewExecution(e.id));
+
+    row.append(id, status, when, arts, view);
+    els.history.appendChild(row);
+  }
+}
+
+async function viewExecution(executionId) {
+  detailExecution = executionId;
+  setDetailStatus("");
+  els.detailPreviewBody.textContent = "";
+  els.detailPreview.classList.add("hidden");
+  els.execDetailTitle.textContent = `Execution #${executionId}`;
+  els.execDetailMeta.textContent = "loading…";
+  els.detailStdout.textContent = "";
+  els.detailStderr.textContent = "";
+  els.detailError.textContent = "";
+  els.detailArtifacts.textContent = "";
+  els.execDetail.classList.remove("hidden");
+  try {
+    const d = await apiFetch(`/executions/${executionId}?include_code=false`);
+    els.execDetailMeta.textContent =
+      `${d.status} · exit ${d.exit_code ?? "–"}`
+      + (d.duration_ms != null ? ` · ${d.duration_ms} ms` : "")
+      + ` · ${formatWhen(d.created_at)}`;
+    els.detailStdout.textContent = d.stdout || "(empty)";
+    els.detailStderr.textContent = d.stderr || "(empty)";
+    els.detailError.textContent = d.error || "–";
+    renderArtifacts(els.detailArtifacts, d.artifacts, d.id, { preview: true });
+    setDetailStatus("");
+  } catch (err) {
+    els.execDetailMeta.textContent = "";
+    setDetailStatus(err.message, true);
+  }
+}
+
+function closeDetail() {
+  els.execDetail.classList.add("hidden");
+  detailExecution = null;
+}
+
 // --- run -------------------------------------------------------------------------
 
 async function runCode() {
@@ -371,11 +614,12 @@ async function runCode() {
     });
     els.stdout.textContent = result.stdout || "";
     els.stderr.textContent = result.stderr || "";
-    renderArtifacts(result.artifacts);
+    renderArtifacts(els.artifacts, result.artifacts, result.execution_id);
     els.meta.textContent =
       `#${result.execution_id} · ${result.status} · exit ${result.exit_code ?? "–"} · ${result.credits_remaining} credits left`;
     setIndicators(result.credits_remaining, null);
     loadLedger();
+    loadHistory();
     if (result.error) {
       showBanner(result.status === "timeout" ? "info" : "error", result.error);
     } else if (result.status === "completed") {
@@ -410,6 +654,13 @@ els.ledgerToggle.addEventListener("click", () => {
   if (!hidden) loadLedger();
 });
 els.run.addEventListener("click", runCode);
+els.closeDetail.addEventListener("click", closeDetail);
+els.execDetail.addEventListener("click", (ev) => {
+  if (ev.target === els.execDetail) closeDetail(); // click on the backdrop
+});
+document.addEventListener("keydown", (ev) => {
+  if (ev.key === "Escape" && !els.execDetail.classList.contains("hidden")) closeDetail();
+});
 els.clear.addEventListener("click", () => {
   resetOutput();
   els.code.value = "";
@@ -439,11 +690,13 @@ els.code.addEventListener("keydown", (ev) => {
     loadBillingConfig();
     if (apiKey()) {
       loadLedger();
+      loadHistory();
       els.ledgerPanel.classList.remove("hidden");
       els.ledgerToggle.textContent = "Hide";
       els.ledgerToggle.setAttribute("aria-expanded", "true");
     }
   } else {
     loadBillingConfig();
+    loadHistory();
   }
 })();
