@@ -6,3 +6,6 @@ python-dotenv
 httpx
 email-validator  # pydantic EmailStr (KeyRequest) needs it
 solari-sandbox>=0.2.0  # verified in docs/SOLARI_SDK_SURFACE.md
+pytest  # test suite (exekit/tests/)
+pytest-cov  # coverage reporting
+pytest-asyncio  # async runner tests
