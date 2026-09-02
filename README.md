@@ -59,6 +59,17 @@ product bills to the same balance.
 - **Desktop** — you need a *screen*: computer-use agents, GUI apps, anything
   that has to be clicked. A sandbox plus X11 and a live VNC stream.
 
+## ExecKit — a full product built on the Sandbox
+
+[exekit/](exekit/) is a complete, tested SaaS built on the Sandbox product:
+an execution API for untrusted AI-generated Python with hashed API keys,
+a credit ledger, Stripe billing, stateful sessions, execution history with
+downloadable artifacts, rate limiting, an admin dashboard, and a browser
+playground — plus a 237-test suite. See
+[exekit/README.md](exekit/README.md),
+[exekit/docs/API.md](exekit/docs/API.md), and
+[exekit/docs/ARCHITECTURE.md](exekit/docs/ARCHITECTURE.md).
+
 ## Gotchas the examples encode
 
 Things that cost you an afternoon if you meet them cold:

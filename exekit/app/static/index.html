@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ExecKit — Execute AI-generated Python safely</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">⌘</span>
+      <div>
+        <h1>ExecKit</h1>
+        <p class="tagline">Execute AI-generated Python code safely.</p>
+      </div>
+    </div>
+    <span class="badge" title="Executions run in isolated Solari microVMs">Powered by Solari Sandbox</span>
+  </header>
+
+  <main class="layout">
+    <!-- ---------------- left panel: key / session ---------------- -->
+    <aside class="panel side">
+      <section class="card">
+        <h2>API key</h2>
+        <label class="field">
+          <span>Key</span>
+          <input id="api-key-input" type="password" placeholder="ek_live_…" autocomplete="off" spellcheck="false">
+        </label>
+        <div class="row">
+          <button id="btn-get-key" class="btn primary">Get free API key</button>
+          <button id="btn-load-info" class="btn">Load key info</button>
+        </div>
+        <div class="meter-row">
+          <div class="meter"><div id="credits-bar" class="meter-fill"></div></div>
+          <div class="indicators">
+            <span id="credits-indicator" class="indicator" title="Remaining credits">– credits</span>
+            <span id="plan-indicator" class="indicator" title="Plan">– plan</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Billing</h2>
+        <div class="billing-status-row">
+          <span id="billing-status" class="indicator" data-state="unknown">– billing</span>
+          <span id="billing-package" class="billing-package">1000 credits / $19</span>
+        </div>
+        <div class="balance-row">
+          <span id="billing-balance" class="balance" title="Current credit balance">–</span>
+          <span class="balance-label">credits</span>
+        </div>
+        <button id="btn-buy-credits" class="btn primary buy-btn">Buy 1000 credits</button>
+        <p class="hint">Credits are added after payment confirmation.</p>
+      </section>
+
+      <section class="card">
+        <h2>Credit history</h2>
+        <button id="btn-ledger-toggle" class="btn link-btn" aria-expanded="false">Show</button>
+        <div id="ledger-panel" class="ledger hidden">
+          <table class="ledger-table">
+            <thead>
+              <tr><th>When</th><th>Reason</th><th>Δ</th><th>Balance</th></tr>
+            </thead>
+            <tbody id="ledger-body">
+              <tr><td colspan="4" class="placeholder">No entries yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Session</h2>
+        <label class="field">
+          <span>Session ID</span>
+          <input id="session-input" type="text" placeholder="sess_… (empty = one-shot)" autocomplete="off" spellcheck="false">
+        </label>
+        <label class="check">
+          <input id="keep-session" type="checkbox" checked>
+          <span>Keep session alive</span>
+        </label>
+        <div class="row">
+          <button id="btn-create-session" class="btn">Create session</button>
+          <button id="btn-kill-session" class="btn danger">Kill session</button>
+        </div>
+        <p class="hint">A session keeps variables and imports between runs, like a notebook. Leave the ID empty for one-shot runs.</p>
+      </section>
+    </aside>
+
+    <!-- ---------------- main panel: editor + output ---------------- -->
+    <section class="panel main">
+      <div class="card editor-card">
+        <div class="editor-head">
+          <h2>Python</h2>
+          <div class="row">
+            <button id="btn-run" class="btn primary">▶ Run</button>
+            <button id="btn-clear" class="btn">Clear</button>
+          </div>
+        </div>
+        <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off">print("Hello from ExecKit")
+import random
+print(random.randint(1, 100))</textarea>
+      </div>
+
+      <div class="card output-card">
+        <div class="editor-head">
+          <h2>Output</h2>
+          <span id="exec-meta" class="meta"></span>
+        </div>
+        <div class="output-grid">
+          <div class="out-block">
+            <h3>stdout</h3>
+            <pre id="out-stdout" class="out"></pre>
+          </div>
+          <div class="out-block">
+            <h3>stderr</h3>
+            <pre id="out-stderr" class="out err"></pre>
+          </div>
+        </div>
+        <div id="banner" class="banner hidden"></div>
+        <div class="out-block">
+          <h3>artifacts</h3>
+          <div id="artifacts" class="artifacts"><span class="placeholder">No artifacts yet. Write files to /tmp/exekit/ in your code.</span></div>
+        </div>
+      </div>
+
+      <div class="card history-card">
+        <div class="editor-head">
+          <h2>Execution history</h2>
+          <span id="history-meta" class="meta"></span>
+        </div>
+        <div id="history" class="history"><span class="placeholder">Enter an API key to see your recent executions.</span></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span>Built with Solari SDK.</span>
+    <span>Designed for AI agents, automations, and code-execution APIs.</span>
+  </footer>
+
+  <!-- execution detail modal (opened from the history panel) -->
+  <div id="exec-detail" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="editor-head">
+        <h2 id="exec-detail-title">Execution</h2>
+        <button id="btn-close-detail" class="btn">Close</button>
+      </div>
+      <span id="exec-detail-meta" class="meta"></span>
+      <span id="detail-status" class="detail-status"></span>
+      <div class="output-grid">
+        <div class="out-block">
+          <h3>stdout</h3>
+          <pre id="detail-stdout" class="out"></pre>
+        </div>
+        <div class="out-block">
+          <h3>stderr</h3>
+          <pre id="detail-stderr" class="out err"></pre>
+        </div>
+      </div>
+      <div class="out-block">
+        <h3>error</h3>
+        <pre id="detail-error" class="out err"></pre>
+      </div>
+      <div id="detail-preview" class="out-block hidden">
+        <h3>artifact preview</h3>
+        <pre id="detail-preview-body" class="out"></pre>
+      </div>
+      <div class="out-block">
+        <h3>artifacts</h3>
+        <div id="detail-artifacts" class="artifacts"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

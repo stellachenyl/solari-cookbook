@@ -1,0 +1,276 @@
+SOLARI SDK INTROSPECTION
+generated: 2026-09-01T22:33:59+00:00
+python:    3.12.10
+source:    live introspection of the installed package (cross-check against docs/SOLARI_SDK_SURFACE.md)
+
+sdk imported: yes (solari-sandbox 0.2.0)
+
+=== solari_sandbox exports ===
+  ActionError (type)
+  AuthError (type)
+  CodeLanguage (_LiteralGenericAlias)
+  CodeResultItem (type)
+  CommandResult (type)
+  CompiledImage (type)
+  ConcurrencyLimitError (type)
+  ConnectionError (type)
+  CreateDesktopResponse (type)
+  CreateSandboxResponse (type)
+  DeleteDesktopResponse (type)
+  Desktop (type)
+  DesktopConfig (type)
+  DesktopLifecycleResponse (type)
+  DesktopStatus (_LiteralGenericAlias)
+  ExecResult (type)
+  ExecStreamChunk (type)
+  ExecStreamHandler (_CallableGenericAlias)
+  FsEntry (type)
+  FsSearchMatch (type)
+  FsStat (type)
+  FsWatchEvent (type)
+  GatewayError (type)
+  GatewayErrorBody (type)
+  GetDesktopResponse (type)
+  GitBranch (type)
+  GitCommit (type)
+  GitStatus (type)
+  HealthResult (type)
+  HttpTransport (type)
+  Image (type)
+  KeyAction (_LiteralGenericAlias)
+  LocalCopy (type)
+  MetricsResult (type)
+  MouseAction (_LiteralGenericAlias)
+  MouseButton (_LiteralGenericAlias)
+  NoCapacityError (type)
+  PackageManager (_LiteralGenericAlias)
+  PkgInstallResult (type)
+  PlanError (type)
+  PortInfo (type)
+  ProcessInfo (type)
+  RpcErrorBody (type)
+  RpcResponse (type)
+  RunCodeResult (type)
+  Sandbox (type)
+  SandboxClient (type)
+  SandboxKind (_LiteralGenericAlias)
+  SandboxState (_LiteralGenericAlias)
+  SandboxView (type)
+  ScreenshotFormat (_LiteralGenericAlias)
+  SessionConfig (type)
+  SessionHandle (type)
+  SessionHooks (type)
+  SnapshotView (type)
+  SolariError (type)
+  SyncSandboxClient (type)
+  SyncTemplateClient (type)
+  SyncVolumeClient (type)
+  TemplateClient (type)
+  TimeoutError (type)
+  VolumeClient (type)
+  annotations (_Feature)
+  new_idempotency_key (function)
+  sandbox_client (module)
+
+=== solari_core exports ===
+  ActionError (type)
+  AuthError (type)
+  CodeLanguage (_LiteralGenericAlias)
+  CodeResultItem (type)
+  CommandResult (type)
+  CompiledImage (type)
+  ConcurrencyLimitError (type)
+  ConnectionError (type)
+  CreateDesktopResponse (type)
+  CreateSandboxResponse (type)
+  DeleteDesktopResponse (type)
+  Desktop (type)
+  DesktopConfig (type)
+  DesktopLifecycleResponse (type)
+  DesktopStatus (_LiteralGenericAlias)
+  ExecResult (type)
+  ExecStreamChunk (type)
+  ExecStreamHandler (_CallableGenericAlias)
+  FsEntry (type)
+  FsSearchMatch (type)
+  FsStat (type)
+  FsWatchEvent (type)
+  GatewayError (type)
+  GatewayErrorBody (type)
+  GetDesktopResponse (type)
+  GitBranch (type)
+  GitCommit (type)
+  GitStatus (type)
+  HealthResult (type)
+  HttpTransport (type)
+  Image (type)
+  KeyAction (_LiteralGenericAlias)
+  LocalCopy (type)
+  MetricsResult (type)
+  MouseAction (_LiteralGenericAlias)
+  MouseButton (_LiteralGenericAlias)
+  NoCapacityError (type)
+  PackageManager (_LiteralGenericAlias)
+  PkgInstallResult (type)
+  PlanError (type)
+  PortInfo (type)
+  ProcessInfo (type)
+  RpcErrorBody (type)
+  RpcResponse (type)
+  RunCodeResult (type)
+  Sandbox (type)
+  SandboxKind (_LiteralGenericAlias)
+  SandboxState (_LiteralGenericAlias)
+  SandboxView (type)
+  ScreenshotFormat (_LiteralGenericAlias)
+  SessionConfig (type)
+  SessionHandle (type)
+  SessionHooks (type)
+  SnapshotView (type)
+  SolariError (type)
+  SyncTemplateClient (type)
+  SyncVolumeClient (type)
+  TemplateClient (type)
+  TimeoutError (type)
+  VolumeClient (type)
+  annotations (_Feature)
+  desktop (module)
+  errors (module)
+  handle (module)
+  image (module)
+  new_idempotency_key (function)
+  sandbox (module)
+  template_client (module)
+  transport (module)
+  types (module)
+  volume_client (module)
+  ws (module)
+
+=== literal types ===
+  CodeLanguage = typing.Literal['python', 'javascript', 'typescript', 'bash', 'r']
+  SandboxState = typing.Literal['starting', 'running', 'paused', 'archived', 'releasing', 'gone']
+  SandboxKind = typing.Literal['sandbox', 'desktop']
+
+=== client classes ===
+class solari_sandbox.sandbox_client.SandboxClient: Async client for the Solari sandbox gateway.
+  __init__(self, *, api_key: 'str', base_url: 'str', http: 'Optional[httpx.AsyncClient]' = None, call_timeout_ms: 'Optional[int]' = None, kind: 'SandboxKind' = 'sandbox') -> 'None'
+  aclose(self) -> 'None'
+  connect(self, sandbox_id: 'str') -> 'Sandbox'  # Re-attach to a running sandbox by id.
+  create(self, *, template: 'Optional[str]' = None, cpu: 'Optional[int]' = None, mem_mb: 'Optional[int]' = None, disk_gb: 'Optional[int]' = None, envs: 'Optional[Dict[str, str]]' = None, metadata: 'Optional[Dict[str, str]]' = None, timeout_ms: 'Optional[int]' = None, from_snapshot: 'Optional[str]' = None, lifecycle: 'Optional[Dict[str, Any]]' = None, volumes: 'Optional[List[Dict[str, str]]]' = None) -> 'Sandbox'  # Create a new sandbox (``POST /sandboxes``). ``lifecycle`` is the idle
+  create_desktop(self, *, template: 'Optional[str]' = None, cpu: 'Optional[int]' = None, mem_mb: 'Optional[int]' = None, disk_gb: 'Optional[int]' = None, envs: 'Optional[Dict[str, str]]' = None, metadata: 'Optional[Dict[str, str]]' = None, timeout_ms: 'Optional[int]' = None, from_snapshot: 'Optional[str]' = None, resolution: 'Optional[str]' = None, record: 'Optional[bool]' = None, lifecycle: 'Optional[Dict[str, Any]]' = None, volumes: 'Optional[List[Dict[str, str]]]' = None) -> 'Desktop'  # Create a GUI desktop via the unified route (``POST /sandboxes`` with
+  delete_snapshot(self, snapshot_id: 'str') -> 'None'  # ``DELETE /snapshots/:id`` (refused if it has live children).
+  get(self, sandbox_id: 'str') -> 'SandboxView'  # ``GET /sandboxes/:id``.
+  get_snapshot(self, snapshot_id: 'str') -> 'SnapshotView'  # ``GET /snapshots/:id``.
+  kill(self, sandbox_id: 'str') -> 'None'  # ``DELETE /sandboxes/:id``. Idempotent.
+  list(self, *, metadata: 'Optional[Dict[str, str]]' = None, state: 'Optional[SandboxState]' = None, kind: 'Optional[SandboxKind]' = None, limit: 'Optional[int]' = None, cursor: 'Optional[str]' = None) -> 'Dict[str, Any]'  # ``GET /sandboxes`` — filter + paginate. Returns ``{sandboxes, nextCursor?}``.
+  list_all(self, *, metadata: 'Optional[Dict[str, str]]' = None, state: 'Optional[SandboxState]' = None, kind: 'Optional[SandboxKind]' = None, limit: 'Optional[int]' = None)  # Auto-paginate :meth:`list`: async-iterate every matching sandbox
+  list_snapshots(self, *, template: 'Optional[str]' = None, kind: 'Optional[SandboxKind]' = None, limit: 'Optional[int]' = None) -> 'List[SnapshotView]'  # ``GET /snapshots``.
+  promote_snapshot(self, snapshot_id: 'str', name: 'str') -> 'Dict[str, Any]'  # ``POST /snapshots/:id/promote`` → template.
+
+class solari_sandbox.sandbox_client.SyncSandboxClient: Thin synchronous wrapper over :class:`SandboxClient`.
+  __init__(self, *, api_key: 'str', base_url: 'str', call_timeout_ms: 'Optional[int]' = None, kind: 'SandboxKind' = 'sandbox') -> 'None'
+  close(self) -> 'None'
+  connect(self, sandbox_id: 'str') -> 'Sandbox'
+  create(self, **kwargs: 'Any') -> 'Sandbox'
+  create_desktop(self, **kwargs: 'Any') -> 'Desktop'  # Create a GUI desktop via the unified ``/sandboxes`` {kind:desktop} route.
+  delete_snapshot(self, snapshot_id: 'str') -> 'None'
+  get(self, sandbox_id: 'str') -> 'SandboxView'
+  get_snapshot(self, snapshot_id: 'str') -> 'SnapshotView'
+  kill(self, sandbox_id: 'str') -> 'None'
+  list(self, **kwargs: 'Any') -> 'Dict[str, Any]'
+  list_all(self, **kwargs: 'Any') -> 'List[SandboxView]'  # Auto-paginate ``list`` and return every matching sandbox as a list
+  list_snapshots(self, **kwargs: 'Any') -> 'List[SnapshotView]'
+  promote_snapshot(self, snapshot_id: 'str', name: 'str') -> 'Dict[str, Any]'
+
+=== session handle (Sandbox / shared base) ===
+class solari_core.sandbox.Sandbox: A live headless sandbox session.
+  __init__(self, session: 'CreateSandboxResponse', config: 'Optional[SessionConfig]' = None) -> 'None'
+  close(self) -> 'None'
+  connect(self) -> 'None'
+  @property connected
+  create_code_context(self, language: 'CodeLanguage' = 'python') -> 'str'  # Create a fresh stateful kernel context (``code.context.create``).
+  download_url(self, path: 'str') -> 'Dict[str, Any]'  # Signed, time-limited URL to download an in-guest file directly over
+  env(self, vars: 'Dict[str, str]') -> 'None'  # Inject/replace per-session env vars in the guest (``setEnv``).
+  kill(self) -> 'None'
+  metrics(self) -> 'MetricsResult'
+  pause(self) -> 'None'
+  preview_url(self, port: 'int') -> 'Dict[str, Any]'  # Public preview URL for an in-guest port (e.g. a dev server on 3000).
+  reconnect(self) -> 'None'
+  resume(self) -> 'None'
+  revert(self, snapshot_id: 'str') -> 'None'
+  run_code(self, code: 'str', *, language: 'Optional[CodeLanguage]' = None, context_id: 'Optional[str]' = None, on_stdout: 'Optional[Callable[[str], None]]' = None, on_stderr: 'Optional[Callable[[str], None]]' = None) -> 'RunCodeResult'  # Run code in a stateful kernel (``code.run``).
+  @property sandboxId
+  set_timeout(self, timeout_ms: 'int') -> 'Dict[str, Any]'
+  snapshot(self, name: 'Optional[str]' = None) -> 'str'
+  upload_url(self, path: 'Optional[str]' = None) -> 'Dict[str, Any]'  # Signed, time-limited URL to upload a file into the guest over HTTP.
+
+=== method namespaces (instance attributes of SessionHandle) ===
+class solari_core.handle._Files: ``handle.files``.
+  __init__(self, h: 'SessionHandle') -> 'None'
+  download(self, path: 'str') -> 'bytes'
+  list(self, path: 'str') -> 'List[FsEntry]'
+  mkdir(self, path: 'str') -> 'None'
+  read(self, path: 'str') -> 'bytes'
+  read_text(self, path: 'str') -> 'str'
+  remove(self, path: 'str', recursive: 'bool' = False) -> 'None'
+  rename(self, frm: 'str', to: 'str') -> 'None'
+  search(self, path: 'str', query: 'str', max_results: 'Optional[int]' = None) -> 'List[FsSearchMatch]'
+  stat(self, path: 'str') -> 'FsStat'
+  upload(self, path: 'str', data: 'Union[bytes, str]') -> 'None'
+  watch(self, path: 'str', cb: 'Callable[[FsWatchEvent], None]', recursive: 'bool' = False) -> 'Callable[[], Awaitable[None]]'  # Watch ``path``; ``cb`` runs per ``fs.event`` frame. Returns an unwatch.
+  write(self, path: 'str', data: 'Union[bytes, str]', mode: 'Optional[int]' = None) -> 'None'
+
+class solari_core.handle._Commands: ``handle.commands``.
+  __init__(self, h: 'SessionHandle') -> 'None'
+  connect(self) -> 'None'
+  run(self, cmd: 'str', *, args: 'Optional[List[str]]' = None, cwd: 'Optional[str]' = None, env: 'Optional[Dict[str, str]]' = None, user: 'Optional[str]' = None, timeout_ms: 'Optional[int]' = None, background: 'bool' = False, on_stdout: 'Optional[Callable[[str], None]]' = None, on_stderr: 'Optional[Callable[[str], None]]' = None) -> 'CommandResult'  # Run a command to completion (or detached when ``background``).
+  start(self, cmd: 'str', *, args: 'Optional[List[str]]' = None, cwd: 'Optional[str]' = None, env: 'Optional[Dict[str, str]]' = None, user: 'Optional[str]' = None, on_stdout: 'Optional[Callable[[str], None]]' = None, on_stderr: 'Optional[Callable[[str], None]]' = None) -> '_CommandHandle'  # Start a command; returns a handle (does not wait for exit). The guest
+
+class solari_core.handle._Pty: ``handle.pty``.
+  __init__(self, h: 'SessionHandle') -> 'None'
+  create(self, *, cols: 'int', rows: 'int', cmd: 'Optional[str]' = None, cwd: 'Optional[str]' = None, env: 'Optional[Dict[str, str]]' = None) -> '_PtyHandle'  # Open a PTY; output streams as ``pty.data`` frames.
+
+class solari_core.handle._Git: ``handle.git`` — a first-class version-control surface (Daytona-parity).
+  __init__(self, h: 'SessionHandle') -> 'None'
+  add(self, paths: 'List[str]', cwd: 'Optional[str]' = None) -> 'None'  # Stage ``paths`` (use ``["."]`` for everything).
+  branches(self, cwd: 'Optional[str]' = None) -> "'list[GitBranch]'"  # List local branches (name, short commit, whether it's HEAD).
+  checkout(self, ref: 'str', *, cwd: 'Optional[str]' = None, create: 'bool' = False) -> 'None'  # Check out an existing ref, or create a branch with ``create=True``.
+  clone(self, url: 'str', *, path: 'Optional[str]' = None, branch: 'Optional[str]' = None, depth: 'Optional[int]' = None, username: 'Optional[str]' = None, password: 'Optional[str]' = None, cwd: 'Optional[str]' = None) -> 'None'  # Clone ``url`` into ``path`` (or git's default dir) under ``cwd``.
+  commit(self, message: 'str', *, cwd: 'Optional[str]' = None, author: 'Optional[str]' = None, email: 'Optional[str]' = None, all: 'bool' = False) -> 'Dict[str, str]'  # Commit staged changes; returns ``{"hash": ...}``.
+  log(self, *, cwd: 'Optional[str]' = None, max_count: 'Optional[int]' = None) -> "'list[GitCommit]'"  # Recent commits, newest first.
+  pull(self, *, cwd: 'Optional[str]' = None, remote: 'Optional[str]' = None, branch: 'Optional[str]' = None, username: 'Optional[str]' = None, password: 'Optional[str]' = None) -> 'None'  # Pull from a remote (default ``origin`` + current branch).
+  push(self, *, cwd: 'Optional[str]' = None, remote: 'Optional[str]' = None, branch: 'Optional[str]' = None, username: 'Optional[str]' = None, password: 'Optional[str]' = None) -> 'None'  # Push to a remote (default ``origin`` + current branch).
+  status(self, cwd: 'Optional[str]' = None) -> 'GitStatus'  # Parsed working-tree status (branch, ahead/behind, staged/modified/untracked).
+
+class solari_core.handle._Volumes: ``handle.volumes``.
+  __init__(self, h: 'SessionHandle') -> 'None'
+  mount(self, vol_id: 'str', path: 'str') -> 'None'  # Mount a volume into the guest (thin guest RPC; gateway route may 501).
+
+=== result / data types ===
+@dataclass RunCodeResult(results: 'list[CodeResultItem]', error: Any, charts: 'list[Chart]')
+  # Result of ``run_code``.
+@dataclass CodeResultItem(type: Literal['stdout', 'stderr', 'result'], text: Optional[str], png: Optional[str], jpeg: Optional[str], svg: Optional[str], html: Optional[str], latex: Optional[str], json: Any, markdown: Optional[str], chart: Optional[Chart])
+  # One rich result object from ``code.run``.
+@dataclass CommandResult(exitCode: int, stdout: str, stderr: str)
+  # Terminal result of ``commands.run``.
+@dataclass ExecResult(exitCode: int, stdout: str, stderr: str)
+  # ExecResult(exitCode: 'int', stdout: 'str', stderr: 'str')
+@dataclass FsEntry(name: str, dir: bool, size: int)
+  # FsEntry(name: 'str', dir: 'bool', size: 'int')
+@dataclass FsStat(name: str, dir: bool, size: int, mode: int, modTimeMs: int)
+  # FsStat(name: 'str', dir: 'bool', size: 'int', mode: 'int', modTimeMs: 'int')
+@dataclass SandboxView(sandboxId: str, kind: SandboxKind, state: SandboxState, metadata: dict, expiresAt: str, cpu: int, memMb: int)
+  # ``GET /sandboxes/:id`` response.
+@dataclass CreateSandboxResponse(sandboxId: str, kind: SandboxKind, controlUrl: str, expiresAt: str, streamUrl: Optional[str])
+  # ``201`` response from ``POST /sandboxes``.
+
+=== error classes ===
+  ActionError: A computer-use RPC returned ``{ok:false}``.
+  AuthError: ``401`` — the API key was missing, malformed, or rejected.
+  ConcurrencyLimitError: ``429 {code:"ConcurrencyLimitExceeded"}`` — too many live desktops.
+  ConnectionError: The control WebSocket is not open (never connected, or closed).
+  GatewayError: Any non-2xx response from the gateway that isn't otherwise specialized.
+  NoCapacityError: ``503`` — no desktop host currently available to serve the request.
+  PlanError: ``402 {code:"FeatureRequiresPlan"}`` — the plan doesn't allow this.
+  SolariError: Base class for every error thrown by the SDK.
+  TimeoutError: An RPC did not receive a reply within the per-call timeout.

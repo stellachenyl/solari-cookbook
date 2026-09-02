@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ExecKit Admin</title>
+  <link rel="stylesheet" href="/static/admin.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">⚙</span>
+      <h1>ExecKit Admin</h1>
+    </div>
+    <div class="connect-row">
+      <input id="token-input" type="password" placeholder="Admin token" autocomplete="off">
+      <button id="btn-connect" class="btn primary">Connect</button>
+      <button id="btn-refresh" class="btn hidden">Refresh</button>
+      <button id="btn-disconnect" class="btn danger hidden">Disconnect</button>
+    </div>
+  </header>
+
+  <div id="banner" class="banner hidden"></div>
+
+  <nav id="tabs" class="tabs hidden">
+    <button class="tab active" data-section="stats">Stats</button>
+    <button class="tab" data-section="keys">Keys</button>
+    <button class="tab" data-section="executions">Executions</button>
+    <button class="tab" data-section="sessions">Sessions</button>
+    <button class="tab" data-section="ledger">Ledger</button>
+    <button class="tab" data-section="stripe">Stripe Events</button>
+  </nav>
+
+  <main id="layout" class="layout hidden">
+    <section id="section-stats" class="section active">
+      <h2>Overview</h2>
+      <div id="stats-grid" class="stats-grid"></div>
+    </section>
+
+    <section id="section-keys" class="section">
+      <h2>API keys</h2>
+      <table class="admin-table">
+        <thead>
+          <tr><th>ID</th><th>Last4</th><th>Email</th><th>Plan</th><th>Credits</th>
+              <th>Execs</th><th>Status</th><th>Created</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="keys-body"></tbody>
+      </table>
+    </section>
+
+    <section id="section-executions" class="section">
+      <h2>Recent executions</h2>
+      <table class="admin-table">
+        <thead>
+          <tr><th>ID</th><th>Key</th><th>Session</th><th>Status</th>
+              <th>Exit</th><th>Created</th><th>Finished</th></tr>
+        </thead>
+        <tbody id="executions-body"></tbody>
+      </table>
+    </section>
+
+    <section id="section-sessions" class="section">
+      <h2>Sessions</h2>
+      <table class="admin-table">
+        <thead>
+          <tr><th>Session ID</th><th>Solari ID</th><th>Key</th><th>Status</th>
+              <th>Created</th><th>Last used</th><th>Killed</th></tr>
+        </thead>
+        <tbody id="sessions-body"></tbody>
+      </table>
+    </section>
+
+    <section id="section-ledger" class="section">
+      <h2>Credit ledger</h2>
+      <table class="admin-table">
+        <thead>
+          <tr><th>ID</th><th>Key</th><th>Amount</th><th>Balance after</th>
+              <th>Reason</th><th>Created</th></tr>
+        </thead>
+        <tbody id="ledger-body"></tbody>
+      </table>
+    </section>
+
+    <section id="section-stripe" class="section">
+      <h2>Stripe events</h2>
+      <table class="admin-table">
+        <thead>
+          <tr><th>ID</th><th>Event ID</th><th>Type</th><th>Key</th>
+              <th>Credits</th><th>Processed</th></tr>
+        </thead>
+        <tbody id="stripe-body"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="/static/admin.js"></script>
+<script src="/static/admin_page.js"></script>
+</body>
+</html>
