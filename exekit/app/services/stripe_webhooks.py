@@ -150,6 +150,18 @@ def _extract_checkout_info(event: dict) -> dict | None:
         )
         return None
     amount_total = data_object.get("amount_total")
+    price_usd = get_settings().stripe_credit_price_usd
+    if isinstance(amount_total, int) and amount_total != price_usd * 100:
+        # The charged amount must match the package price. Metadata and the
+        # session are both written by our own checkout; if they disagree, the
+        # session was not created by today's checkout path (misconfiguration
+        # or account compromise) — do not grant.
+        logger.warning(
+            "checkout event %s amount_total=%s does not match the package "
+            "price (%d cents); ignoring", event.get("id", "?"), amount_total,
+            price_usd * 100,
+        )
+        return None
     return {
         "api_key_id": api_key_id,
         "credits": credits,

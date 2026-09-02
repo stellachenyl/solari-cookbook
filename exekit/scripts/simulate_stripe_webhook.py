@@ -30,7 +30,7 @@ import uuid
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-def build_event(api_key_id: int, credits: int) -> dict:
+def build_event(api_key_id: int, credits: int, price_usd: int) -> dict:
     return {
         "id": "evt_sim_" + uuid.uuid4().hex,
         "object": "event",
@@ -44,7 +44,7 @@ def build_event(api_key_id: int, credits: int) -> dict:
                 "object": "checkout.session",
                 "mode": "payment",
                 "payment_status": "paid",
-                "amount_total": None,  # server fills from its own package config
+                "amount_total": price_usd * 100,  # cents, matching the package
                 "metadata": {
                     "api_key_id": str(api_key_id),
                     "credits": str(credits),
@@ -91,8 +91,12 @@ def main() -> int:
                         help="credits to grant (default: the server's configured package)")
     args = parser.parse_args()
 
+    from app.config import get_settings
+
+    settings = get_settings()
+    credits = args.credits if args.credits is not None else settings.stripe_credit_amount
     secret = os.environ.get("STRIPE_WEBHOOK_SECRET", "").strip()
-    event = build_event(args.key_id, args.credits or 0)
+    event = build_event(args.key_id, credits, settings.stripe_credit_price_usd)
 
     payload = json.dumps(event).encode("utf-8")
 

@@ -63,20 +63,35 @@ def test_webhook_missing_payment_status_is_not_granted(client, key_id, stripe_en
         assert db.get(ApiKey, key_id).credits == 25
 
 
-# --- BUG-5 (suspected, medium): amount_total is never validated ------------------
+# --- BUG-5 (fixed): amount_total is validated against the package price -----------
 #
 # A correctly signed event with amount_total=1 cent but metadata credits=1000
-# grants 1000 credits. Metadata is server-set, so this requires a server bug
-# or account compromise — but validating amount_total against the package
-# price is exactly the "do not trust amounts" defense the brief demands.
+# no longer grants — the charged amount must match the package price.
 
-@pytest.mark.xfail(reason="BUG-5 (suspected): grant does not verify amount_total "
-                          "matches the package price; needs product decision", strict=True)
 def test_webhook_amount_mismatch_is_not_granted(client, key_id, stripe_enabled, engine):
     resp = post_webhook(client, grant_event(key_id, amount_total=1))  # paid $0.01
     assert resp.json() == {"ignored": True}
     with DBSession(engine) as db:
         assert db.get(ApiKey, key_id).credits == 25
+
+
+def test_webhook_matching_amount_is_granted(client, key_id, stripe_enabled, engine):
+    """The happy path is untouched: amount_total == price * 100 grants."""
+    resp = post_webhook(client, grant_event(key_id, amount_total=19 * 100))
+    assert resp.json() == {"received": True}
+    with DBSession(engine) as db:
+        assert db.get(ApiKey, key_id).credits == 25 + 1000
+
+
+def test_webhook_absent_amount_total_still_grants(client, key_id, stripe_enabled, engine):
+    """Some Stripe event shapes/tests omit amount_total; the check applies
+    only when the field is present (isinstance int), so absence grants."""
+    event = grant_event(key_id)
+    del event["data"]["object"]["amount_total"]
+    resp = post_webhook(client, event)
+    assert resp.json() == {"received": True}
+    with DBSession(engine) as db:
+        assert db.get(ApiKey, key_id).credits == 25 + 1000
 
 
 # --- BUG-4 (low, fixed): malformed metadata type crashed the webhook --------------
