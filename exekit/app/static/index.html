@@ -123,6 +123,14 @@ print(random.randint(1, 100))</textarea>
           <div id="artifacts" class="artifacts"><span class="placeholder">No artifacts yet. Write files to /tmp/exekit/ in your code.</span></div>
         </div>
       </div>
+
+      <div class="card history-card">
+        <div class="editor-head">
+          <h2>Execution history</h2>
+          <span id="history-meta" class="meta"></span>
+        </div>
+        <div id="history" class="history"><span class="placeholder">Enter an API key to see your recent executions.</span></div>
+      </div>
     </section>
   </main>
 
@@ -130,6 +138,40 @@ print(random.randint(1, 100))</textarea>
     <span>Built with Solari SDK.</span>
     <span>Designed for AI agents, automations, and code-execution APIs.</span>
   </footer>
+
+  <!-- execution detail modal (opened from the history panel) -->
+  <div id="exec-detail" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="editor-head">
+        <h2 id="exec-detail-title">Execution</h2>
+        <button id="btn-close-detail" class="btn">Close</button>
+      </div>
+      <span id="exec-detail-meta" class="meta"></span>
+      <span id="detail-status" class="detail-status"></span>
+      <div class="output-grid">
+        <div class="out-block">
+          <h3>stdout</h3>
+          <pre id="detail-stdout" class="out"></pre>
+        </div>
+        <div class="out-block">
+          <h3>stderr</h3>
+          <pre id="detail-stderr" class="out err"></pre>
+        </div>
+      </div>
+      <div class="out-block">
+        <h3>error</h3>
+        <pre id="detail-error" class="out err"></pre>
+      </div>
+      <div id="detail-preview" class="out-block hidden">
+        <h3>artifact preview</h3>
+        <pre id="detail-preview-body" class="out"></pre>
+      </div>
+      <div class="out-block">
+        <h3>artifacts</h3>
+        <div id="detail-artifacts" class="artifacts"></div>
+      </div>
+    </div>
+  </div>
 
   <script src="/static/app.js"></script>
 </body>
