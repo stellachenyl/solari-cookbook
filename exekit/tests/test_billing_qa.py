@@ -79,14 +79,12 @@ def test_webhook_amount_mismatch_is_not_granted(client, key_id, stripe_enabled, 
         assert db.get(ApiKey, key_id).credits == 25
 
 
-# --- BUG-4 (low): malformed metadata type crashes the webhook ---------------------
+# --- BUG-4 (low, fixed): malformed metadata type crashed the webhook --------------
 #
-# _extract_checkout_info calls metadata.get(...) on whatever the event carries.
-# A signed event with a non-dict metadata is external input and must be
-# ignored cleanly, not answered with a 500.
+# _extract_checkout_info called metadata.get(...) on whatever the event
+# carries. A signed event with a non-dict metadata is external input and is
+# now ignored cleanly instead of answering 500.
 
-@pytest.mark.xfail(reason="BUG-4: non-dict metadata raises AttributeError -> 500 "
-                          "instead of a clean ignore", strict=True)
 def test_webhook_malformed_metadata_type_is_ignored(client, key_id, stripe_enabled):
     event = make_event(key_id, 1000, metadata="junk")
     resp = post_webhook(client, event)

@@ -118,6 +118,13 @@ def _extract_checkout_info(event: dict) -> dict | None:
             event.get("id", "?"), payment_status,
         )
         return None
+    if not isinstance(metadata, dict):
+        # External input: a signed-but-malformed event must be ignored, not 500.
+        logger.warning(
+            "checkout event %s metadata is not a mapping (%s); ignoring",
+            event.get("id", "?"), type(metadata).__name__,
+        )
+        return None
     try:
         api_key_id = int(metadata.get("api_key_id", ""))
         credits = int(metadata.get("credits", ""))
